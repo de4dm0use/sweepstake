@@ -1,50 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Sweepstake Live</title>
 
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body{
-  margin:0;
-  font-family:Arial;
-  background:#050816;
-  color:white;
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0b1020;
+  color: white;
 }
 
-header{
-  padding:16px;
-  text-align:center;
-  background:#0f172a;
-  font-weight:bold;
+header {
+  padding: 16px;
+  text-align: center;
+  background: #111a33;
+  font-weight: bold;
 }
 
-.container{
-  max-width:900px;
-  margin:auto;
-  padding:15px;
-  display:grid;
-  gap:15px;
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
 }
 
-.card{
-  background:rgba(255,255,255,0.05);
-  border:1px solid rgba(255,255,255,0.08);
-  border-radius:12px;
-  padding:15px;
+.card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
 }
 
-.row{
-  display:flex;
-  justify-content:space-between;
-  padding:8px;
-  border-bottom:1px solid rgba(255,255,255,0.08);
+.row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-.small{opacity:0.7;font-size:12px;}
+.small {
+  font-size: 12px;
+  opacity: 0.7;
+}
 </style>
 </head>
 
@@ -54,60 +58,79 @@ header{
 
 <div class="container">
 
-<div class="card">
-<h2>Leaderboard</h2>
-<div id="board">Loading...</div>
-</div>
+  <div class="card">
+    <h2>Leaderboard</h2>
+    <div id="board">Loading...</div>
+  </div>
 
-<div class="card">
-<h2>Fixtures</h2>
-<div id="fixtures">Loading...</div>
-</div>
+  <div class="card">
+    <h2>Fixtures</h2>
+    <div id="fixtures">Loading...</div>
+  </div>
 
 </div>
 
 <script>
 
 /////////////////////////////////////////////////////
-// 1. SUPABASE (PASTE YOUR KEY HERE)
+// 1. SUPABASE (ONLY ONCE — FIXES YOUR ERROR)
 /////////////////////////////////////////////////////
+
 const supabaseUrl = "https://cvytbxrkgeitzvimpmea.supabase.co";
-const supabaseKey = "PUT_YOUR_ANON_KEY_HERE";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2eXRieHJrZ2VpdHp2aW1wbWVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODY4NDEsImV4cCI6MjA5NjE2Mjg0MX0.firN5TH54_LoiMtlJDoef6AKWAIaRlU7JQQRgooyuXM"; // <-- PUT YOUR KEY HERE
 
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-console.log("Supabase client loaded");
+console.log("Supabase loaded");
+
+/////////////////////////////////////////////////////
+// 2. FIXTURES (NO API = ALWAYS WORKS)
+/////////////////////////////////////////////////////
+
+const FIXTURES = [
+  { home: "Argentina", away: "Iraq", stage: "Group A", date: "2026-06-10" },
+  { home: "England", away: "Spain", stage: "Group B", date: "2026-06-11" },
+  { home: "Brazil", away: "Japan", stage: "Group C", date: "2026-06-12" },
+  { home: "France", away: "Germany", stage: "Group D", date: "2026-06-13" },
+  { home: "Portugal", away: "Netherlands", stage: "Group E", date: "2026-06-14" }
+];
+
+function loadFixtures() {
+  document.getElementById("fixtures").innerHTML =
+    FIXTURES.map(f => `
+      <div class="row">
+        <div>
+          <b>${f.home}</b> vs <b>${f.away}</b>
+          <div class="small">${f.stage} • ${f.date}</div>
+        </div>
+        <div>-</div>
+      </div>
+    `).join("");
+}
+
+/////////////////////////////////////////////////////
+// 3. LEADERBOARD (SUPABASE LIVE)
+/////////////////////////////////////////////////////
 
 async function loadLeaderboard() {
 
   const board = document.getElementById("board");
-
-  if (!board) {
-    console.log("❌ board div not found");
-    return;
-  }
-
   board.innerHTML = "Loading...";
 
-  const res = await supabase.from("leaderboard").select("*");
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select("*");
 
-  console.log("FULL RESPONSE:", res);
-
-  const { data, error } = res;
+  console.log("Leaderboard data:", data);
+  console.log("Leaderboard error:", error);
 
   if (error) {
-    console.log("❌ ERROR:", error);
-    board.innerHTML = "Supabase error (check console)";
+    board.innerHTML = "❌ Supabase error (check console)";
     return;
   }
 
-  if (!data) {
-    board.innerHTML = "No data returned";
-    return;
-  }
-
-  if (data.length === 0) {
-    board.innerHTML = "Table is empty (no rows)";
+  if (!data || data.length === 0) {
+    board.innerHTML = "No players yet";
     return;
   }
 
@@ -121,72 +144,8 @@ async function loadLeaderboard() {
   `).join("");
 }
 
-loadLeaderboard();
-setInterval(loadLeaderboard, 3000);
-
 /////////////////////////////////////////////////////
-// 2. FIXTURES SYSTEM (NO API)
-/////////////////////////////////////////////////////
-
-const FIXTURES = [
-  {home:"Argentina", away:"Iraq", stage:"Group A", date:"2026-06-10", homeScore:null, awayScore:null},
-  {home:"England", away:"Spain", stage:"Group B", date:"2026-06-11", homeScore:null, awayScore:null},
-  {home:"Brazil", away:"Japan", stage:"Group C", date:"2026-06-12", homeScore:null, awayScore:null},
-  {home:"France", away:"Germany", stage:"Group D", date:"2026-06-13", homeScore:null, awayScore:null}
-];
-
-function loadFixtures(){
-
-  document.getElementById("fixtures").innerHTML =
-    FIXTURES.map(f=>`
-      <div class="row">
-        <div>
-          <b>${f.home}</b> vs <b>${f.away}</b>
-          <div class="small">${f.stage} • ${f.date}</div>
-        </div>
-        <div>
-          ${f.homeScore ?? "-"} - ${f.awayScore ?? "-"}
-        </div>
-      </div>
-    `).join("");
-
-}
-
-/////////////////////////////////////////////////////
-// 3. LEADERBOARD (SUPABASE)
-/////////////////////////////////////////////////////
-
-async function loadLeaderboard(){
-
-  const { data, error } = await supabase
-    .from("leaderboard")
-    .select("*")
-    .order("score", { ascending: false });
-
-  if(error){
-    console.log(error);
-    document.getElementById("board").innerHTML =
-      "DB Error";
-    return;
-  }
-
-  if(!data || data.length === 0){
-    document.getElementById("board").innerHTML =
-      "No data yet";
-    return;
-  }
-
-  document.getElementById("board").innerHTML =
-    data.map((p,i)=>`
-      <div class="row">
-        <span>#${i+1} ${p.player}</span>
-        <span>${p.score}</span>
-      </div>
-    `).join("");
-}
-
-/////////////////////////////////////////////////////
-// 4. START APP
+// 4. INIT APP
 /////////////////////////////////////////////////////
 
 loadFixtures();
