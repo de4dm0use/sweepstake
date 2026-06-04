@@ -1,182 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WC Sweepstake Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-
-<style>
-body { background:#020617; color:white; font-family: sans-serif; }
-.card { background: rgba(30,41,59,0.6); padding:10px; border-radius:10px; margin-bottom:8px; }
-.small { font-size:12px; color:#94a3b8; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WC 2026 Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
 </head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
 
-<body class="p-4">
+    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-3">
+            <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
+            <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit">
+                <p class="text-slate-500 text-sm">Syncing data...</p>
+            </div>
+        </div>
 
-<h1 class="text-2xl font-bold mb-4">⚽ WC Sweepstake Dashboard</h1>
+        <div class="lg:col-span-5">
+            <h2 class="text-xl font-black mb-4 text-blue-400">⚽ Match Schedule</h2>
+            <div id="match-table" class="space-y-3">
+                <p class="text-slate-500 text-sm">Fetching matches...</p>
+            </div>
+        </div>
 
-<div class="grid grid-cols-3 gap-4">
-
-    <div>
-        <h2 class="text-amber-400 font-bold mb-2">Leaderboard</h2>
-        <div id="leaderboard"></div>
+        <div class="lg:col-span-4">
+            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats</h2>
+            <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto">
+                <p class="text-slate-500 text-sm">Loading standings...</p>
+            </div>
+        </div>
     </div>
 
-    <div>
-        <h2 class="text-blue-400 font-bold mb-2">Matches</h2>
-        <div id="matches"></div>
-    </div>
+    <script>
+        const roster = [
+            { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
+            { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
+            { name: "Alex", countries: ["Canada", "Haiti", "USA"] },
+            { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
+            { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea"] },
+            { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast"] },
+            { name: "Mason", countries: ["Egypt", "Germany", "New Zealand"] },
+            { name: "Elijah", countries: ["South Africa", "France", "Congo DR"] },
+            { name: "Owen", countries: ["Morocco", "Netherlands", "Tunisia"] },
+            { name: "Oscar W", countries: ["Ghana", "Panama", "Norway"] },
+            { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
+            { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
+            { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
+            { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] },
+            { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
+            { name: "Joel", countries: ["England", "Spain", "Austria"] }
+        ];
 
-    <div>
-        <h2 class="text-emerald-400 font-bold mb-2">Odds</h2>
-        <div id="odds"></div>
-    </div>
+        async function init() {
+            const proxy = "https://corsproxy.io/?";
+            
+            // Fetch Matches
+            try {
+                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
+                const dataMatches = await resMatches.json();
+                renderMatches(dataMatches.matches);
+                renderLeaderboard(dataMatches.matches);
+            } catch (e) {
+                document.getElementById('match-table').innerHTML = "Error loading matches.";
+            }
 
-</div>
+            // Fetch Standings (Stats)
+            try {
+                const resStats = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
+                const dataStats = await resStats.json();
+                renderStats(dataStats.standings);
+            } catch (e) {
+                document.getElementById('stats-table').innerHTML = "No stats available yet.";
+            }
+        }
 
-<script>
+        function renderStats(standings) {
+            const container = document.getElementById('stats-table');
+            container.innerHTML = "";
+            if (!standings) return;
+            
+            standings.forEach(group => {
+                container.innerHTML += `<h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">${group.group}</h3>`;
+                group.table.forEach(team => {
+                    container.innerHTML += `
+                        <div class="flex justify-between items-center text-sm py-1 border-b border-slate-800/50">
+                            <span class="truncate w-1/2">${team.team.name}</span>
+                            <div class="flex gap-4 font-mono text-xs">
+                                <span class="text-slate-400">P:${team.playedGames}</span>
+                                <span class="text-emerald-400 font-bold">${team.points}pts</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+        }
 
-const proxy = "https://api.allorigins.win/raw?url=";
+        function renderMatches(matches) {
+            const table = document.getElementById('match-table');
+            table.innerHTML = matches.map(m => `
+                <div class="glass p-4 rounded-xl flex justify-between items-center border border-slate-800 text-sm">
+                    <div class="w-1/3 truncate font-medium text-xs">${m.homeTeam.name}</div>
+                    <div class="font-mono font-black bg-slate-950 px-2 py-1 rounded mx-2">${m.score.fullTime.home ?? '-'} : ${m.score.fullTime.away ?? '-'}</div>
+                    <div class="w-1/3 truncate text-right font-medium text-xs">${m.awayTeam.name}</div>
+                </div>
+            `).join('');
+        }
 
-const FOOTBALL_KEY = "55a93c4b0f5142c4bfa22b58edbc5177";
-const ODDS_KEY = "0505e1fe83a9649a8048acec4cb62fd7";
+        function renderLeaderboard(matches) {
+            let points = {};
+            roster.forEach(r => points[r.name] = 0);
+            
+            matches.filter(m => m.status === "FINISHED").forEach(m => {
+                const h = roster.find(r => r.countries.some(c => m.homeTeam.name.includes(c)))?.name;
+                const a = roster.find(r => r.countries.some(c => m.awayTeam.name.includes(c)))?.name;
+                if(m.score.fullTime.home > m.score.fullTime.away) { if(h) points[h]+=3; }
+                else if(m.score.fullTime.away > m.score.fullTime.home) { if(a) points[a]+=3; }
+                else { if(h) points[h]+=1; if(a) points[a]+=1; }
+            });
 
-/* ---------------- FULL ROSTER ---------------- */
-const roster = [
-    { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
-    { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
-    { name: "Alex", countries: ["Canada", "Haiti", "USA", "United States"] },
-    { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
-    { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea", "Korea Republic"] },
-    { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast", "Cote d'Ivoire"] },
-    { name: "Mason", countries: ["Egypt", "Germany", "New Zealand"] },
-    { name: "Elijah", countries: ["South Africa", "France", "Congo DR", "DR Congo"] },
-    { name: "Owen", countries: ["Morocco", "Netherlands", "Tunisia"] },
-    { name: "Oscar W", countries: ["Ghana", "Panama", "Norway"] },
-    { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
-    { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
-    { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
-    { name: "Edwyn", countries: ["Curacao", "Curaçao", "Bosnia and Herzegovina", "Paraguay"] },
-    { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
-    { name: "Joel", countries: ["England", "Spain", "Austria"] }
-];
+            const sorted = Object.entries(points).sort((a,b) => b[1] - a[1]);
+            document.getElementById('leaderboard').innerHTML = sorted.map((p,i) => `
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="${i<3?'text-amber-400 font-bold':''}">${i+1}. ${p[0]}</span>
+                    <span class="font-bold">${p[1]} pts</span>
+                </div>
+            `).join('');
+        }
 
-function norm(x){
-    return (x||"").toLowerCase().replace(/[^a-z0-9 ]/g,"").trim();
-}
-
-let oddsMap = {};
-
-/* ---------------- ODDS ---------------- */
-async function loadOdds(){
-    const url =
-    `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_KEY}&regions=uk&markets=outrights`;
-
-    const res = await fetch(proxy + encodeURIComponent(url));
-    const data = await res.json();
-
-    oddsMap = {};
-
-    const outcomes =
-        data?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
-
-    outcomes.forEach(o=>{
-        oddsMap[norm(o.name)] = o.price;
-    });
-}
-
-/* ---------------- MATCHES ---------------- */
-async function loadMatches(){
-    const url = "https://api.football-data.org/v4/competitions/WC/matches";
-
-    const res = await fetch(proxy + encodeURIComponent(url), {
-        headers: { "X-Auth-Token": FOOTBALL_KEY }
-    });
-
-    return await res.json();
-}
-
-/* ---------------- OWNER FIX ---------------- */
-function getOwner(team){
-    const t = norm(team);
-
-    const found = roster.find(r =>
-        r.countries.some(c =>
-            t.includes(norm(c)) || norm(c).includes(t)
-        )
-    );
-
-    return found ? found.name : "Unowned";
-}
-
-/* ---------------- LEADERBOARD ---------------- */
-function renderLeaderboard(matches){
-    let pts = {};
-    roster.forEach(r=>pts[r.name]=0);
-
-    (matches||[]).forEach(m=>{
-        const h = roster.find(r=>r.countries.some(c=>norm(m.homeTeam.name).includes(norm(c))))?.name;
-        const a = roster.find(r=>r.countries.some(c=>norm(m.awayTeam.name).includes(norm(c))))?.name;
-
-        const hs = m.score?.fullTime?.home;
-        const as = m.score?.fullTime?.away;
-
-        if(hs==null || as==null) return;
-
-        if(hs>as && h) pts[h]+=3;
-        else if(as>hs && a) pts[a]+=3;
-    });
-
-    document.getElementById("leaderboard").innerHTML =
-        Object.entries(pts)
-        .sort((a,b)=>b[1]-a[1])
-        .map(p=>`
-            <div class="card">
-                <b>${p[0]}</b><br>
-                <span class="small">${p[1]} pts</span>
-            </div>
-        `).join("");
-}
-
-/* ---------------- MATCHES ---------------- */
-function renderMatches(matches){
-    document.getElementById("matches").innerHTML =
-        (matches||[]).slice(0,10).map(m=>`
-            <div class="card small">
-                ${m.homeTeam.name} vs ${m.awayTeam.name}<br>
-                <b>${m.score?.fullTime?.home ?? "-"} : ${m.score?.fullTime?.away ?? "-"}</b>
-            </div>
-        `).join("");
-}
-
-/* ---------------- ODDS ---------------- */
-function renderOdds(){
-    document.getElementById("odds").innerHTML =
-        Object.entries(oddsMap).slice(0,10).map(([k,v])=>`
-            <div class="card small">
-                ${k} → <b>${v}</b>
-            </div>
-        `).join("");
-}
-
-/* ---------------- INIT ---------------- */
-async function init(){
-
-    await loadOdds();
-    renderOdds();
-
-    const matchesData = await loadMatches();
-    const matches = matchesData?.matches || [];
-
-    renderMatches(matches);
-    renderLeaderboard(matches);
-}
-
-init();
-
-</script>
-
+        init();
+    </script>
 </body>
 </html>
