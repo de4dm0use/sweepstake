@@ -19,7 +19,7 @@
 
     <div class="lg:col-span-3">
         <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
-        <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit"></div>
+        <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800"></div>
     </div>
 
     <div class="lg:col-span-5">
@@ -46,7 +46,7 @@ let oddsMap = {};
 const roster = [
     { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
     { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
-    { name: "Alex", countries: ["Canada", "Haiti", "USA"] }, // USA FIX
+    { name: "Alex", countries: ["Canada", "Haiti", "USA"] },
     { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
     { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea"] },
     { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast"] },
@@ -57,7 +57,7 @@ const roster = [
     { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
     { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
     { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
-    { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] }, // CURACAO FIX
+    { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] },
     { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
     { name: "Joel", countries: ["England", "Spain", "Austria"] }
 ];
@@ -71,30 +71,15 @@ function normalize(n) {
         .trim();
 }
 
-/* ---------------- ALIASES ---------------- */
-const aliases = {
-    "usa": "united states",
-    "united states": "united states",
-    "curacao": "curacao",
-    "cote divoire": "ivory coast",
-    "ivory coast": "cote divoire",
-    "korea republic": "south korea",
-    "south korea": "korea republic"
-};
-
-/* ---------------- ODDS FIX ---------------- */
+/* ---------------- ODDS ---------------- */
 function getOdds(team) {
-    let name = normalize(team);
+    const t = normalize(team);
 
-    if (aliases[name]) {
-        name = normalize(aliases[name]);
-    }
+    if (oddsMap[t]) return oddsMap[t];
 
-    if (oddsMap[name]) return oddsMap[name];
-
-    for (const key of Object.keys(oddsMap)) {
-        if (key.includes(name) || name.includes(key)) {
-            return oddsMap[key];
+    for (const k of Object.keys(oddsMap)) {
+        if (k.includes(t) || t.includes(k)) {
+            return oddsMap[k];
         }
     }
 
@@ -115,17 +100,17 @@ function renderMatches(matches) {
     const el = document.getElementById("match-table");
 
     if (!matches?.length) {
-        el.innerHTML = "<p class='text-slate-500 text-sm'>No matches</p>";
+        el.innerHTML = "<p class='text-slate-500'>No matches</p>";
         return;
     }
 
     el.innerHTML = matches.map(m => `
-        <div class="glass p-4 rounded-xl flex justify-between items-center border border-slate-800 text-sm">
-            <div class="w-1/3 truncate text-xs">${m.homeTeam?.name}</div>
-            <div class="font-mono font-black px-2 py-1 bg-slate-950 rounded">
+        <div class="glass p-4 rounded-xl flex justify-between border border-slate-800 text-sm">
+            <div class="w-1/3 truncate">${m.homeTeam?.name}</div>
+            <div class="font-mono">
                 ${m.score?.fullTime?.home ?? "-"} : ${m.score?.fullTime?.away ?? "-"}
             </div>
-            <div class="w-1/3 text-right truncate text-xs">${m.awayTeam?.name}</div>
+            <div class="w-1/3 text-right truncate">${m.awayTeam?.name}</div>
         </div>
     `).join("");
 }
@@ -157,16 +142,17 @@ function renderLeaderboard(matches) {
         }
     });
 
-    const sorted = Object.entries(points).sort((a,b)=>b[1]-a[1]);
-
-    document.getElementById("leaderboard").innerHTML = sorted.map((p,i)=>`
-        <div class="flex justify-between py-2 border-b border-slate-800">
-            <span class="${i<3?'text-amber-400 font-bold':''}">
-                ${i+1}. ${p[0]}
-            </span>
-            <span class="font-bold">${p[1]} pts</span>
-        </div>
-    `).join("");
+    document.getElementById("leaderboard").innerHTML =
+        Object.entries(points)
+            .sort((a,b)=>b[1]-a[1])
+            .map((p,i)=>`
+                <div class="flex justify-between border-b border-slate-800 py-2">
+                    <span class="${i<3?'text-amber-400 font-bold':''}">
+                        ${i+1}. ${p[0]}
+                    </span>
+                    <span>${p[1]} pts</span>
+                </div>
+            `).join("");
 }
 
 /* ---------------- STATS ---------------- */
@@ -175,12 +161,12 @@ function renderStats(standings) {
     el.innerHTML = "";
 
     if (!standings?.length) {
-        el.innerHTML = "<p class='text-slate-500 text-sm'>No stats</p>";
+        el.innerHTML = "<p class='text-slate-500'>No stats</p>";
         return;
     }
 
     standings.forEach(group => {
-        el.innerHTML += `<h3 class="text-xs text-slate-500 font-bold mt-4 mb-2">${group.group}</h3>`;
+        el.innerHTML += `<h3 class="text-xs text-slate-500 mt-4">${group.group}</h3>`;
 
         group.table.forEach(team => {
             const name = team.team.name;
@@ -189,15 +175,13 @@ function renderStats(standings) {
                 <div class="flex justify-between text-sm py-1 border-b border-slate-800/50">
                     <div class="truncate w-1/2">
                         ${name}
-                        <div class="text-[10px] text-amber-500 uppercase">
+                        <div class="text-[10px] text-amber-500">
                             ${getOwner(name)}
                         </div>
                     </div>
-
-                    <div class="text-right font-mono text-xs">
+                    <div class="text-right text-xs font-mono">
                         <div class="text-slate-400">P:${team.playedGames}</div>
                         <div class="text-emerald-400">${team.points}pts</div>
-                        <div class="text-blue-400">Odds: ${getOdds(name)}</div>
                     </div>
                 </div>
             `;
@@ -208,7 +192,8 @@ function renderStats(standings) {
 /* ---------------- INIT ---------------- */
 async function init() {
     try {
-        // ODDS
+
+        // ODDS (proxy only)
         const oddsURL =
             `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_KEY}&regions=uk&markets=outrights`;
 
@@ -216,23 +201,27 @@ async function init() {
         const data = await o.json();
 
         oddsMap = {};
-
-        const outcomes =
-            data?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+        const outcomes = data?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
 
         outcomes.forEach(x => {
             oddsMap[normalize(x.name)] = x.price;
         });
 
-        // MATCHES
-        const m = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
+        // MATCHES (direct)
+        const m = await fetch(
+            "https://api.football-data.org/v4/competitions/WC/matches",
+            { headers: { "X-Auth-Token": FOOTBALL_KEY } }
+        );
         const md = await m.json();
 
         renderMatches(md.matches || []);
         renderLeaderboard(md.matches || []);
 
-        // STANDINGS
-        const s = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
+        // STANDINGS (direct)
+        const s = await fetch(
+            "https://api.football-data.org/v4/competitions/WC/standings",
+            { headers: { "X-Auth-Token": FOOTBALL_KEY } }
+        );
         const sd = await s.json();
 
         renderStats(sd.standings || []);
