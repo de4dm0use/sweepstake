@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sweepstake</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+body{margin:0;font-family:Arial;background:#050816;color:white;}
+header{padding:15px;text-align:center;background:#0f172a;font-weight:bold;}
+.container{max-width:900px;margin:auto;padding:15px;}
+.card{background:rgba(255,255,255,0.05);padding:15px;border-radius:12px;}
+.row{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #222;}
+</style>
+</head>
+
+<body>
+
+<header>🏆 Sweepstake Live</header>
+
+<div class="container">
+
+<div class="card">
+<h2>Leaderboard</h2>
+<div id="board">Loading...</div>
+</div>
+
+</div>
+
+<script>
+
+// 🔑 SUPABASE CONNECT
+const supabaseUrl = "https://cvytbxrkgeitzvimpmea.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2eXRieHJrZ2VpdHp2aW1wbWVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODY4NDEsImV4cCI6MjA5NjE2Mjg0MX0.firN5TH54_LoiMtlJDoef6AKWAIaRlU7JQQRgooyuXM";
+
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// 📊 LOAD LEADERBOARD
+async function loadLeaderboard(){
+
+  const { data } = await supabase
+    .from("leaderboard")
+    .select("*")
+    .order("score", { ascending: false });
+
+  if(!data) return;
+
+  document.getElementById("board").innerHTML =
+    data.map((p,i)=>`
+      <div class="row">
+        <span>#${i+1} ${p.player}</span>
+        <span>${p.score}</span>
+      </div>
+    `).join("");
+}
+
+loadLeaderboard();
+setInterval(loadLeaderboard,3000);
+
+</script>
+
+</body>
+</html>
