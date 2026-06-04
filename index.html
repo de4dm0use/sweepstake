@@ -71,12 +71,58 @@ header{
 /////////////////////////////////////////////////////
 // 1. SUPABASE (PASTE YOUR KEY HERE)
 /////////////////////////////////////////////////////
-
 const supabaseUrl = "https://cvytbxrkgeitzvimpmea.supabase.co";
-
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2eXRieHJrZ2VpdHp2aW1wbWVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODY4NDEsImV4cCI6MjA5NjE2Mjg0MX0.firN5TH54_LoiMtlJDoef6AKWAIaRlU7JQQRgooyuXM";
+const supabaseKey = "PUT_YOUR_ANON_KEY_HERE";
 
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+console.log("Supabase client loaded");
+
+async function loadLeaderboard() {
+
+  const board = document.getElementById("board");
+
+  if (!board) {
+    console.log("❌ board div not found");
+    return;
+  }
+
+  board.innerHTML = "Loading...";
+
+  const res = await supabase.from("leaderboard").select("*");
+
+  console.log("FULL RESPONSE:", res);
+
+  const { data, error } = res;
+
+  if (error) {
+    console.log("❌ ERROR:", error);
+    board.innerHTML = "Supabase error (check console)";
+    return;
+  }
+
+  if (!data) {
+    board.innerHTML = "No data returned";
+    return;
+  }
+
+  if (data.length === 0) {
+    board.innerHTML = "Table is empty (no rows)";
+    return;
+  }
+
+  data.sort((a, b) => b.score - a.score);
+
+  board.innerHTML = data.map((p, i) => `
+    <div class="row">
+      <span>#${i + 1} ${p.player}</span>
+      <span>${p.score}</span>
+    </div>
+  `).join("");
+}
+
+loadLeaderboard();
+setInterval(loadLeaderboard, 3000);
 
 /////////////////////////////////////////////////////
 // 2. FIXTURES SYSTEM (NO API)
