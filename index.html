@@ -1,96 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>WC Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WC 2026 Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
 </head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
 
-<body class="bg-slate-950 text-white p-6">
-
-<h1 class="text-2xl font-bold mb-6">World Cup Dashboard</h1>
-
-<div class="grid grid-cols-3 gap-4">
-
-    <div>
-        <h2 class="text-amber-400 font-bold mb-2">Leaderboard</h2>
-        <div id="leaderboard"></div>
-    </div>
-
-    <div>
-        <h2 class="text-blue-400 font-bold mb-2">Matches</h2>
-        <div id="matches"></div>
-    </div>
-
-    <div>
-        <h2 class="text-emerald-400 font-bold mb-2">Stats</h2>
-        <div id="stats"></div>
-    </div>
-
-</div>
-
-<script>
-const API = "http://localhost:3000/api"; // change this when deployed
-
-const roster = [
-    { name:"Alex", countries:["USA"] },
-    { name:"Edwyn", countries:["Curacao"] }
-];
-
-function norm(n){
-    return (n||"").toLowerCase();
-}
-
-async function load(){
-
-    const matches = await fetch(API + "/matches").then(r=>r.json());
-    const stats = await fetch(API + "/standings").then(r=>r.json());
-
-    // ---------------- MATCHES ----------------
-    document.getElementById("matches").innerHTML =
-        (matches.matches||[]).slice(0,8).map(m=>`
-            <div class="text-sm border-b border-slate-800 py-1">
-                ${m.homeTeam.name} vs ${m.awayTeam.name}
+    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-3">
+            <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
+            <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit">
+                <p class="text-slate-500 text-sm">Syncing data...</p>
             </div>
-        `).join("");
+        </div>
 
-    // ---------------- STATS ----------------
-    document.getElementById("stats").innerHTML =
-        (stats.standings||[]).slice(0,2).map(g=>`
-            <div class="text-xs mb-3">
-                <div class="text-slate-400">${g.group}</div>
-                ${g.table.map(t=>`
-                    <div>${t.team.name} - ${t.points}</div>
-                `).join("")}
+        <div class="lg:col-span-5">
+            <h2 class="text-xl font-black mb-4 text-blue-400">⚽ Match Schedule</h2>
+            <div id="match-table" class="space-y-3">
+                <p class="text-slate-500 text-sm">Fetching matches...</p>
             </div>
-        `).join("");
+        </div>
 
-    // ---------------- LEADERBOARD ----------------
-    let points = {};
-    roster.forEach(r => points[r.name] = 0);
+        <div class="lg:col-span-4">
+            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats</h2>
+            <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto">
+                <p class="text-slate-500 text-sm">Loading standings...</p>
+            </div>
+        </div>
+    </div>
 
-    (matches.matches||[]).forEach(m => {
-        const h = roster.find(r => r.countries.some(c =>
-            norm(m.homeTeam.name).includes(norm(c))
-        ))?.name;
+    <script>
+        const roster = [
+            { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
+            { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
+            { name: "Alex", countries: ["Canada", "Haiti", "USA"] },
+            { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
+            { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea"] },
+            { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast"] },
+            { name: "Mason", countries: ["Egypt", "Germany", "New Zealand"] },
+            { name: "Elijah", countries: ["South Africa", "France", "Congo DR"] },
+            { name: "Owen", countries: ["Morocco", "Netherlands", "Tunisia"] },
+            { name: "Oscar W", countries: ["Ghana", "Panama", "Norway"] },
+            { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
+            { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
+            { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
+            { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] },
+            { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
+            { name: "Joel", countries: ["England", "Spain", "Austria"] }
+        ];
 
-        const a = roster.find(r => r.countries.some(c =>
-            norm(m.awayTeam.name).includes(norm(c))
-        ))?.name;
+        async function init() {
+            const proxy = "https://corsproxy.io/?";
+            
+            // Fetch Matches
+            try {
+                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
+                const dataMatches = await resMatches.json();
+                renderMatches(dataMatches.matches);
+                renderLeaderboard(dataMatches.matches);
+            } catch (e) {
+                document.getElementById('match-table').innerHTML = "Error loading matches.";
+            }
 
-        if(m.score?.fullTime?.home > m.score?.fullTime?.away && h) points[h] += 3;
-        else if(m.score?.fullTime?.away > m.score?.fullTime?.home && a) points[a] += 3;
-    });
+            // Fetch Standings (Stats)
+            try {
+                const resStats = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
+                const dataStats = await resStats.json();
+                renderStats(dataStats.standings);
+            } catch (e) {
+                document.getElementById('stats-table').innerHTML = "No stats available yet.";
+            }
+        }
 
-    document.getElementById("leaderboard").innerHTML =
-        Object.entries(points)
-            .sort((a,b)=>b[1]-a[1])
-            .map(p=>`<div>${p[0]} - ${p[1]} pts</div>`)
-            .join("");
-}
+        function renderStats(standings) {
+            const container = document.getElementById('stats-table');
+            container.innerHTML = "";
+            if (!standings) return;
+            
+            standings.forEach(group => {
+                container.innerHTML += `<h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">${group.group}</h3>`;
+                group.table.forEach(team => {
+                    container.innerHTML += `
+                        <div class="flex justify-between items-center text-sm py-1 border-b border-slate-800/50">
+                            <span class="truncate w-1/2">${team.team.name}</span>
+                            <div class="flex gap-4 font-mono text-xs">
+                                <span class="text-slate-400">P:${team.playedGames}</span>
+                                <span class="text-emerald-400 font-bold">${team.points}pts</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+        }
 
-load();
-</script>
+        function renderMatches(matches) {
+            const table = document.getElementById('match-table');
+            table.innerHTML = matches.map(m => `
+                <div class="glass p-4 rounded-xl flex justify-between items-center border border-slate-800 text-sm">
+                    <div class="w-1/3 truncate font-medium text-xs">${m.homeTeam.name}</div>
+                    <div class="font-mono font-black bg-slate-950 px-2 py-1 rounded mx-2">${m.score.fullTime.home ?? '-'} : ${m.score.fullTime.away ?? '-'}</div>
+                    <div class="w-1/3 truncate text-right font-medium text-xs">${m.awayTeam.name}</div>
+                </div>
+            `).join('');
+        }
 
+        function renderLeaderboard(matches) {
+            let points = {};
+            roster.forEach(r => points[r.name] = 0);
+            
+            matches.filter(m => m.status === "FINISHED").forEach(m => {
+                const h = roster.find(r => r.countries.some(c => m.homeTeam.name.includes(c)))?.name;
+                const a = roster.find(r => r.countries.some(c => m.awayTeam.name.includes(c)))?.name;
+                if(m.score.fullTime.home > m.score.fullTime.away) { if(h) points[h]+=3; }
+                else if(m.score.fullTime.away > m.score.fullTime.home) { if(a) points[a]+=3; }
+                else { if(h) points[h]+=1; if(a) points[a]+=1; }
+            });
+
+            const sorted = Object.entries(points).sort((a,b) => b[1] - a[1]);
+            document.getElementById('leaderboard').innerHTML = sorted.map((p,i) => `
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="${i<3?'text-amber-400 font-bold':''}">${i+1}. ${p[0]}</span>
+                    <span class="font-bold">${p[1]} pts</span>
+                </div>
+            `).join('');
+        }
+
+        init();
+    </script>
 </body>
 </html>
