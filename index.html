@@ -33,13 +33,14 @@
 </div>
 
 <script>
-/* ---------------- YOUR KEYS ---------------- */
+/* ---------------- KEYS ---------------- */
 const FOOTBALL_KEY = "55a93c4b0f5142c4bfa22b58edbc5177";
 const ODDS_KEY = "0505e1fe83a9649a8048acec4cb62fd7";
 
-/* ---------------- PROXY ---------------- */
-const proxy = "https://api.allorigins.win/raw?url=";
+/* ---------------- CORS PROXY ---------------- */
+const proxy = "https://api.codetabs.com/v1/proxy?quest=";
 
+/* ---------------- DATA ---------------- */
 let odds = {};
 
 /* ---------------- ROSTER ---------------- */
@@ -76,13 +77,13 @@ function renderMatches(data){
   el.innerHTML = "";
 
   if(!data?.matches){
-    el.innerHTML = "No matches";
+    el.innerHTML = "<div class='text-slate-400'>No matches loaded</div>";
     return;
   }
 
   data.matches.slice(0,20).forEach(m=>{
     el.innerHTML += `
-      <div class="border-b border-slate-700 py-2 text-sm">
+      <div class="border-b border-slate-800 py-2 text-sm">
         ${m.homeTeam.name} vs ${m.awayTeam.name}
         <div class="text-xs text-slate-400">${m.status}</div>
       </div>
@@ -147,6 +148,7 @@ function renderStats(data){
 async function init(){
 
   try{
+    /* ODDS */
     const oddsURL =
       `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_KEY}&regions=uk&markets=h2h`;
 
@@ -160,9 +162,12 @@ async function init(){
       odds[x.name.toLowerCase()] = x.price;
     });
 
-  }catch(e){console.log("odds fail",e);}
+  }catch(e){
+    console.log("odds failed", e);
+  }
 
   try{
+    /* MATCHES */
     const m = await fetch(
       proxy + encodeURIComponent(
         "https://api.football-data.org/v4/competitions/WC/matches"
@@ -171,6 +176,7 @@ async function init(){
     const md = await m.json();
     renderMatches(md);
 
+    /* STANDINGS */
     const s = await fetch(
       proxy + encodeURIComponent(
         "https://api.football-data.org/v4/competitions/WC/standings"
@@ -179,10 +185,10 @@ async function init(){
     const sd = await s.json();
 
     renderLeaderboard(sd);
-    renderStats(sd.standings);
+    renderStats(sd?.standings);
 
   }catch(e){
-    console.log("api fail",e);
+    console.log("api failed", e);
   }
 }
 
