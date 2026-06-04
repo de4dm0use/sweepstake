@@ -6,7 +6,7 @@
     <title>2026 World Cup Sweepstakes</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { font-family: system-ui, -apple-system, sans-serif; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen pb-12">
@@ -15,16 +15,14 @@
         <div class="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-black tracking-tight text-amber-400">🏆 2026 WORLD CUP SWEEPSTAKES</h1>
-                <p class="text-slate-400 text-sm mt-1">Live updates via API-Football</p>
+                <p class="text-slate-400 text-sm mt-1">Live updates via football-data.org</p>
             </div>
             
             <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-                <div class="relative">
-                    <input type="password" id="api-key-input" placeholder="Paste API Key here..." 
-                           class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-200 w-full sm:w-48 text-center" />
-                </div>
+                <input type="password" id="api-key-input" placeholder="Paste Auth Token here..." 
+                       class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-200 w-full sm:w-48 text-center" />
                 
-                <button onclick="fetchLiveScores()" id="sync-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer">
+                <button onclick="fetchLiveScores()" id="sync-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer">
                     🔄 Sync Live Scores
                 </button>
             </div>
@@ -34,19 +32,11 @@
     <main class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <div class="lg:col-span-1 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md h-fit">
-            <h2 class="text-xl font-bold mb-4 text-slate-100 border-b border-slate-700 pb-2 flex items-center justify-between">
-                <span>📊 Live Standings</span>
-            </h2>
+            <h2 class="text-xl font-bold mb-4 text-slate-100 border-b border-slate-700 pb-2">📊 Live Standings</h2>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
-                    <thead>
-                        <tr class="text-slate-400 border-b border-slate-700">
-                            <th class="pb-3 font-semibold">Player</th>
-                            <th class="pb-3 font-semibold text-right">Points</th>
-                        </tr>
-                    </thead>
                     <tbody id="leaderboard-body" class="divide-y divide-slate-700/50">
-                        <tr><td colspan="2" class="py-6 text-center text-slate-500">Enter your API key and click Sync to load the table...</td></tr>
+                        <tr><td class="py-6 text-center text-slate-500">Enter token & click Sync...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -56,189 +46,105 @@
             <h2 class="text-xl font-bold text-slate-100 border-b border-slate-700 pb-2">📅 Match Results Log</h2>
             <div id="fixtures-container" class="space-y-3">
                 <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center text-slate-400">
-                    Waiting for sync...
+                    Waiting for data sync...
                 </div>
             </div>
         </div>
     </main>
 
     <script>
-        // The fixed roster! Elijah now properly has the "countries:" tag.
         const roster = [
             { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
             { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
             { name: "Alex", countries: ["Canada", "Haiti", "USA"] },
-            { name: "Christopher", countries: ["Colombia", "Turkiye", "Senegal"] },
+            { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
             { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea"] },
-            { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Cote d'Ivoire"] },
+            { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast"] },
             { name: "Mason", countries: ["Egypt", "Germany", "New Zealand"] },
-            { name: "Elijah", countries: ["South Africa", "France", "DR Congo"] },
+            { name: "Elijah", countries: ["South Africa", "France", "Congo DR"] },
             { name: "Owen", countries: ["Morocco", "Netherlands", "Tunisia"] },
             { name: "Oscar W", countries: ["Ghana", "Panama", "Norway"] },
             { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
             { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
             { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
-            { name: "Edwyn", countries: ["Curacao", "Bosnia-Herzegovina", "Paraguay"] },
-            { name: "Oscar L", countries: ["Czechia", "Uruguay", "Jordan"] },
+            { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] },
+            { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
             { name: "Joel", countries: ["England", "Spain", "Austria"] }
         ];
 
-        // Load saved API Key on page open
         document.addEventListener("DOMContentLoaded", () => {
-            const savedKey = localStorage.getItem('api_football_key');
-            if (savedKey) {
-                document.getElementById('api-key-input').value = savedKey;
-            }
+            document.getElementById('api-key-input').value = localStorage.getItem('fd_token') || '';
         });
 
-        // Match API country names to your friends
         function getOwner(countryName) {
-            const match = roster.find(player => player.countries.includes(countryName));
+            // Simple cleanup to match API names better
+            const match = roster.find(player => player.countries.some(c => countryName.includes(c) || c.includes(countryName)));
             return match ? match.name : "Unowned";
         }
 
-        // The main fetch function
         async function fetchLiveScores() {
-            const apiKey = document.getElementById('api-key-input').value.trim();
-            if (!apiKey) {
-                alert("Please paste your API-Football key into the box first!");
-                return;
-            }
-
-            // Save key to local storage
-            localStorage.setItem('api_football_key', apiKey);
+            const token = document.getElementById('api-key-input').value.trim();
+            if (!token) { alert("Please paste your API Token!"); return; }
+            localStorage.setItem('fd_token', token);
 
             const btn = document.getElementById('sync-btn');
             btn.innerHTML = "⏳ Syncing...";
-            btn.classList.add('opacity-50', 'cursor-not-allowed');
 
             try {
-                // API-Football Endpoint: League 1 = World Cup, Season 2026
-                const response = await fetch("https://v3.football.api-sports.io/fixtures?league=1&season=2026", {
-                    method: "GET",
-                    headers: {
-                        "x-apisports-key": apiKey
-                    }
+                // Fetching World Cup Matches
+                const response = await fetch("https://api.football-data.org/v4/competitions/WC/matches", {
+                    headers: { "X-Auth-Token": token }
                 });
 
-                if (!response.ok) throw new Error("API network response failed");
+                if (!response.ok) throw new Error("API error: " + response.statusText);
                 const data = await response.json();
-
-                if (data.errors && Object.keys(data.errors).length > 0) {
-                    throw new Error(JSON.stringify(data.errors));
-                }
-
-                const fixtures = data.response;
-                if (!fixtures || fixtures.length === 0) {
-                    alert("Connected successfully! However, API-Football hasn't loaded the 2026 fixtures yet. Check back closer to the tournament.");
-                    resetButton(btn);
-                    return;
-                }
-
-                processFixtures(fixtures);
-
-            } catch (error) {
-                console.error("Fetch Error:", error);
-                alert("Failed to sync. Please check that your API key is correct and look at the console for details.");
+                processMatches(data.matches);
+            } catch (err) {
+                console.error(err);
+                alert("Failed to sync. Ensure your token is correct.");
             }
-            
-            resetButton(btn);
-        }
-
-        function resetButton(btn) {
             btn.innerHTML = "🔄 Sync Live Scores";
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
 
-        // Process the data into the tables
-        function processFixtures(fixtures) {
-            let pointsLedger = {};
-            roster.forEach(p => pointsLedger[p.name] = 0);
-            
-            let finishedMatchesHTML = "";
+        function processMatches(matches) {
+            let points = {};
+            roster.forEach(p => points[p.name] = 0);
+            let html = "";
 
-            // Sort matches by date
-            fixtures.sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+            matches.forEach(m => {
+                if (m.status !== "FINISHED") return; // Only count finished games
 
-            fixtures.forEach(item => {
-                const teamA = item.teams.home.name;
-                const teamB = item.teams.away.name;
+                const teamA = m.homeTeam.name;
+                const teamB = m.awayTeam.name;
+                const sA = m.score.fullTime.home;
+                const sB = m.score.fullTime.away;
                 
-                const scoreA = item.goals.home;
-                const scoreB = item.goals.away;
-
                 const ownerA = getOwner(teamA);
                 const ownerB = getOwner(teamB);
-                
-                const status = item.fixture.status.short;
-                
-                // Only count completed matches (FT = Full Time, AET = After Extra Time, PEN = Penalties)
-                const isFinished = ["FT", "AET", "PEN"].includes(status);
 
-                if (isFinished && scoreA !== null && scoreB !== null) {
-                    // Assign Points: 3 for win, 1 for draw
-                    if (scoreA > scoreB) {
-                        if (ownerA !== "Unowned") pointsLedger[ownerA] += 3;
-                    } else if (scoreB > scoreA) {
-                        if (ownerB !== "Unowned") pointsLedger[ownerB] += 3;
-                    } else {
-                        if (ownerA !== "Unowned") pointsLedger[ownerA] += 1;
-                        if (ownerB !== "Unowned") pointsLedger[ownerB] += 1;
-                    }
+                if (sA > sB) points[ownerA] += 3;
+                else if (sB > sA) points[ownerB] += 3;
+                else { points[ownerA] += 1; points[ownerB] += 1; }
 
-                    // Build match visual
-                    finishedMatchesHTML += `
-                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex items-center justify-between shadow-sm hover:bg-slate-750 transition">
-                            <div class="text-right flex-1 min-w-[90px]">
-                                <p class="font-bold text-slate-100 text-sm sm:text-base">${teamA}</p>
-                                <span class="text-[10px] bg-slate-900/60 text-slate-400 px-1.5 py-0.5 rounded mt-1 inline-block">👤 ${ownerA}</span>
-                            </div>
-                            <div class="bg-slate-900 border border-slate-700 font-mono font-black px-4 py-2 mx-4 rounded-xl text-amber-400 shadow-inner text-sm sm:text-base whitespace-nowrap">
-                                ${scoreA} : ${scoreB}
-                            </div>
-                            <div class="text-left flex-1 min-w-[90px]">
-                                <p class="font-bold text-slate-100 text-sm sm:text-base">${teamB}</p>
-                                <span class="text-[10px] bg-slate-900/60 text-slate-400 px-1.5 py-0.5 rounded mt-1 inline-block">👤 ${ownerB}</span>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-
-            if (finishedMatchesHTML === "") {
-                finishedMatchesHTML = `<div class="p-8 text-center text-slate-400 bg-slate-800 border border-slate-700 rounded-xl">No completed matches found yet. The board will update once matches are played!</div>`;
-            }
-
-            document.getElementById('fixtures-container').innerHTML = finishedMatchesHTML;
-
-            // Generate leaderboard
-            let leaderboard = roster.map(p => ({
-                name: p.name,
-                points: pointsLedger[p.name],
-                countries: p.countries.join(', ')
-            })).sort((x, y) => y.points - x.points);
-
-            // Render Leaderboard Sweepstake Table
-            const tbody = document.getElementById('leaderboard-body');
-            tbody.innerHTML = '';
-            leaderboard.forEach((row, idx) => {
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-750/30 transition">
-                        <td class="py-3.5 pr-2">
-                            <div class="flex items-center">
-                                <span class="text-amber-500 font-mono font-bold w-6 text-right mr-3">${idx+1}.</span>
-                                <div>
-                                    <div class="font-bold text-slate-200">${row.name}</div>
-                                    <div class="text-[10px] text-slate-500 mt-0.5">${row.countries}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="py-3.5 font-black text-right text-slate-100 text-lg align-top pt-4">
-                            ${row.points} <span class="text-xs text-slate-500 font-normal">pts</span>
-                        </td>
-                    </tr>
+                html += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex items-center justify-between">
+                        <div class="text-right flex-1"><p class="font-bold">${teamA}</p><span class="text-[10px] text-slate-500">${ownerA}</span></div>
+                        <div class="font-mono bg-slate-900 px-4 py-2 rounded-xl mx-4">${sA} : ${sB}</div>
+                        <div class="text-left flex-1"><p class="font-bold">${teamB}</p><span class="text-[10px] text-slate-500">${ownerB}</span></div>
+                    </div>
                 `;
             });
+
+            document.getElementById('fixtures-container').innerHTML = html || '<p class="text-center p-8">No finished matches yet.</p>';
+            
+            // Leaderboard
+            const sorted = Object.entries(points).sort((a,b) => b[1] - a[1]);
+            document.getElementById('leaderboard-body').innerHTML = sorted.map((row, i) => `
+                <tr class="hover:bg-slate-700/20">
+                    <td class="py-3 px-2 font-bold">${i+1}. ${row[0]}</td>
+                    <td class="py-3 px-2 text-right font-black text-amber-400">${row[1]} pts</td>
+                </tr>
+            `).join('');
         }
     </script>
 </body>
