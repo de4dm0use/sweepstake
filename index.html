@@ -1,241 +1,221 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WC 2026 Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-
-<style>
-.glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WC 2026 Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
 </head>
-
 <body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
 
-<div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-    <div class="lg:col-span-3">
-        <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
-        <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit">
-            <p class="text-slate-500 text-sm">Syncing data...</p>
-        </div>
-    </div>
-
-    <div class="lg:col-span-5">
-        <h2 class="text-xl font-black mb-4 text-blue-400">⚽ Match Schedule</h2>
-        <div id="match-table" class="space-y-3">
-            <p class="text-slate-500 text-sm">Fetching matches...</p>
-        </div>
-    </div>
-
-    <div class="lg:col-span-4">
-        <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats</h2>
-        <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto">
-            <p class="text-slate-500 text-sm">Loading standings...</p>
-        </div>
-    </div>
-
-</div>
-
-<script>
-const FOOTBALL_KEY = "55a93c4b0f5142c4bfa22b58edbc5177";
-const ODDS_KEY = "0505e1fe83a9649a8048acec4cb62fd7";
-
-const proxy = "https://corsproxy.io/?";
-
-let oddsMap = {};
-
-const roster = [
-    { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
-    { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
-    { name: "Alex", countries: ["Canada", "Haiti", "USA"] },
-    { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
-    { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea"] },
-    { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast"] },
-    { name: "Mason", countries: ["Egypt", "Germany", "New Zealand"] },
-    { name: "Elijah", countries: ["South Africa", "France", "Congo DR"] },
-    { name: "Owen", countries: ["Morocco", "Netherlands", "Tunisia"] },
-    { name: "Oscar W", countries: ["Ghana", "Panama", "Norway"] },
-    { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
-    { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
-    { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
-    { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] },
-    { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
-    { name: "Joel", countries: ["England", "Spain", "Austria"] }
-];
-
-function normalize(n) {
-    return String(n || "")
-        .toLowerCase()
-        .replace(/[^\w\s]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-/* ---------------- ODDS FIX ---------------- */
-function getOdds(team) {
-    const t = normalize(team);
-
-    if (oddsMap[t]) return oddsMap[t];
-
-    for (const key of Object.keys(oddsMap)) {
-        if (key.includes(t) || t.includes(key)) {
-            return oddsMap[key];
-        }
-    }
-
-    return "N/A";
-}
-
-/* ---------------- OWNER ---------------- */
-function getOwner(team) {
-    const t = normalize(team);
-    const found = roster.find(p =>
-        p.countries.some(c => t.includes(normalize(c)))
-    );
-    return found ? found.name : "Unowned";
-}
-
-/* ---------------- MATCHES ---------------- */
-function renderMatches(matches) {
-    const el = document.getElementById("match-table");
-
-    if (!matches?.length) {
-        el.innerHTML = "<p class='text-slate-500 text-sm'>No matches</p>";
-        return;
-    }
-
-    el.innerHTML = matches.map(m => `
-        <div class="glass p-4 rounded-xl flex justify-between items-center border border-slate-800 text-sm">
-            <div class="w-1/3 truncate text-xs">${m.homeTeam?.name}</div>
-            <div class="font-mono font-black px-2 py-1 bg-slate-950 rounded">
-                ${m.score?.fullTime?.home ?? "-"} : ${m.score?.fullTime?.away ?? "-"}
+    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-3">
+            <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
+            <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit">
+                <p class="text-slate-500 text-sm">Syncing data...</p>
             </div>
-            <div class="w-1/3 text-right truncate text-xs">${m.awayTeam?.name}</div>
         </div>
-    `).join("");
-}
 
-/* ---------------- LEADERBOARD ---------------- */
-function renderLeaderboard(matches) {
-    let points = {};
-    roster.forEach(r => points[r.name] = 0);
-
-    matches.filter(m => m.status === "FINISHED").forEach(m => {
-        const h = roster.find(r =>
-            r.countries.some(c => normalize(m.homeTeam?.name).includes(normalize(c)))
-        )?.name;
-
-        const a = roster.find(r =>
-            r.countries.some(c => normalize(m.awayTeam?.name).includes(normalize(c)))
-        )?.name;
-
-        const hs = m.score?.fullTime?.home;
-        const as = m.score?.fullTime?.away;
-
-        if (hs == null || as == null) return;
-
-        if (hs > as && h) points[h] += 3;
-        else if (as > hs && a) points[a] += 3;
-        else {
-            if (h) points[h] += 1;
-            if (a) points[a] += 1;
-        }
-    });
-
-    const sorted = Object.entries(points).sort((a,b) => b[1] - a[1]);
-
-    document.getElementById("leaderboard").innerHTML =
-        sorted.map((p,i) => `
-            <div class="flex justify-between py-2 border-b border-slate-800">
-                <span class="${i<3?'text-amber-400 font-bold':''}">
-                    ${i+1}. ${p[0]}
-                </span>
-                <span class="font-bold">${p[1]} pts</span>
+        <div class="lg:col-span-5">
+            <h2 class="text-xl font-black mb-4 text-blue-400">⚽ Match Schedule</h2>
+            <div id="match-table" class="space-y-3">
+                <p class="text-slate-500 text-sm">Fetching matches...</p>
             </div>
-        `).join("");
-}
+        </div>
 
-/* ---------------- STATS ---------------- */
-function renderStats(standings) {
-    const el = document.getElementById("stats-table");
-    el.innerHTML = "";
+        <div class="lg:col-span-4">
+            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats</h2>
+            <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto">
+                <p class="text-slate-500 text-sm">Loading standings...</p>
+            </div>
+        </div>
+    </div>
 
-    if (!standings?.length) {
-        el.innerHTML = "<p class='text-slate-500 text-sm'>No stats</p>";
-        return;
-    }
+    <script>
+        const roster = [
+            { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
+            { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
+            { name: "Alex", countries: ["Canada", "Haiti", "USA"] },
+            { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
+            { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea"] },
+            { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast"] },
+            { name: "Mason", countries: ["Egypt", "Germany", "New Zealand"] },
+            { name: "Elijah", countries: ["South Africa", "France", "Congo DR"] },
+            { name: "Owen", countries: ["Morocco", "Netherlands", "Tunisia"] },
+            { name: "Oscar W", countries: ["Ghana", "Panama", "Norway"] },
+            { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
+            { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
+            { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
+            { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] },
+            { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
+            { name: "Joel", countries: ["England", "Spain", "Austria"] }
+        ];
 
-    standings.forEach(group => {
-        el.innerHTML += `
-            <h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">
-                ${group.group}
-            </h3>
-        `;
+        let oddsMap = {};
 
-        group.table.forEach(team => {
-            const name = team.team.name;
+        function normalizeName(name) {
+            return String(name || "")
+                .toLowerCase()
+                .replace(/[^\w\s]/g, "")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
 
-            el.innerHTML += `
-                <div class="flex justify-between text-sm py-1 border-b border-slate-800/50">
-                    <div class="truncate w-1/2">
-                        ${name}
-                        <div class="text-[10px] text-amber-500 uppercase">
-                            ${getOwner(name)}
+        function getOdds(teamName) {
+            const n = normalizeName(teamName);
+
+            const aliases = {
+                "usa": ["usa", "united states", "united states of america"],
+                "south korea": ["south korea", "korea republic", "republic of korea"],
+                "ivory coast": ["ivory coast", "cote divoire", "côte divoire", "ivory coast"],
+                "congo dr": ["congo dr", "dr congo", "democratic republic of congo", "dem rep congo"],
+                "curacao": ["curacao", "curaçao"],
+                "czech republic": ["czech republic", "czechia"],
+                "saudi arabia": ["saudi arabia"],
+                "bosnia and herzegovina": ["bosnia and herzegovina"],
+                "cape verde": ["cape verde"],
+                "new zealand": ["new zealand"]
+            };
+
+            for (const [key, values] of Object.entries(aliases)) {
+                if (values.some(v => n === normalizeName(v) || n.includes(normalizeName(v)))) {
+                    const found = oddsMap[normalizeName(key)];
+                    if (found !== undefined) return found;
+                }
+            }
+
+            return oddsMap[n] ?? "N/A";
+        }
+
+        function getOwner(teamName) {
+            const found = roster.find(p =>
+                p.countries.some(c => normalizeName(teamName).includes(normalizeName(c)))
+            );
+            return found ? found.name : "Unowned";
+        }
+
+        async function init() {
+            const proxy = "https://corsproxy.io/?";
+
+            // Fetch odds first
+            try {
+                const oddsURL = "https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=0505e1fe83a9649a8048acec4cb62fd7&regions=uk&markets=h2h";
+                const resOdds = await fetch(proxy + oddsURL);
+                const dataOdds = await resOdds.json();
+
+                const outcomes = dataOdds?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+                outcomes.forEach(o => {
+                    oddsMap[normalizeName(o.name)] = o.price;
+                });
+            } catch (e) {
+                console.log("odds fail", e);
+            }
+
+            // Fetch Matches
+            try {
+                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
+                const dataMatches = await resMatches.json();
+                renderMatches(dataMatches.matches || []);
+                renderLeaderboard(dataMatches.matches || []);
+            } catch (e) {
+                document.getElementById('match-table').innerHTML = "Error loading matches.";
+            }
+
+            // Fetch Standings (Stats)
+            try {
+                const resStats = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
+                const dataStats = await resStats.json();
+                renderStats(dataStats.standings || []);
+            } catch (e) {
+                document.getElementById('stats-table').innerHTML = "No stats available yet.";
+            }
+        }
+
+        function renderStats(standings) {
+            const container = document.getElementById('stats-table');
+            container.innerHTML = "";
+            if (!standings.length) {
+                container.innerHTML = `<p class="text-slate-500 text-sm">No standings available yet.</p>`;
+                return;
+            }
+            
+            standings.forEach(group => {
+                container.innerHTML += `<h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">${group.group}</h3>`;
+                group.table.forEach(team => {
+                    const teamName = team.team.name;
+                    const owner = getOwner(teamName);
+                    const odds = getOdds(teamName);
+
+                    container.innerHTML += `
+                        <div class="flex justify-between items-center gap-3 text-sm py-1 border-b border-slate-800/50">
+                            <div class="min-w-0">
+                                <div class="truncate font-medium">${teamName}</div>
+                                <div class="text-[10px] text-amber-500 uppercase font-bold">Owner: ${owner}</div>
+                            </div>
+                            <div class="flex flex-col items-end gap-0.5 font-mono text-xs whitespace-nowrap">
+                                <span class="text-slate-400">P:${team.playedGames}</span>
+                                <span class="text-emerald-400 font-bold">${team.points}pts</span>
+                                <span class="text-blue-400">Odds: ${odds}</span>
+                            </div>
                         </div>
-                    </div>
+                    `;
+                });
+            });
+        }
 
-                    <div class="text-right font-mono text-xs">
-                        <div class="text-slate-400">P:${team.playedGames}</div>
-                        <div class="text-emerald-400">${team.points}pts</div>
-                        <div class="text-blue-400">Odds: ${getOdds(name)}</div>
+        function renderMatches(matches) {
+            const table = document.getElementById('match-table');
+            if (!matches.length) {
+                table.innerHTML = `<p class="text-slate-500 text-sm">No matches available yet.</p>`;
+                return;
+            }
+
+            table.innerHTML = matches.map(m => `
+                <div class="glass p-4 rounded-xl flex justify-between items-center border border-slate-800 text-sm">
+                    <div class="w-1/3 truncate font-medium text-xs">${m.homeTeam?.name ?? "TBD"}</div>
+                    <div class="font-mono font-black bg-slate-950 px-2 py-1 rounded mx-2">
+                        ${m.score?.fullTime?.home ?? '-'} : ${m.score?.fullTime?.away ?? '-'}
                     </div>
+                    <div class="w-1/3 truncate text-right font-medium text-xs">${m.awayTeam?.name ?? "TBD"}</div>
                 </div>
-            `;
-        });
-    });
-}
+            `).join('');
+        }
 
-/* ---------------- INIT ---------------- */
-async function init() {
-    try {
-        // ODDS
-        const oddsURL =
-            `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_KEY}&regions=uk&markets=outrights`;
+        function renderLeaderboard(matches) {
+            let points = {};
+            roster.forEach(r => points[r.name] = 0);
+            
+            matches.filter(m => m.status === "FINISHED").forEach(m => {
+                const homeTeamName = m.homeTeam?.name || "";
+                const awayTeamName = m.awayTeam?.name || "";
+                const h = roster.find(r => r.countries.some(c => normalizeName(homeTeamName).includes(normalizeName(c))))?.name;
+                const a = roster.find(r => r.countries.some(c => normalizeName(awayTeamName).includes(normalizeName(c))))?.name;
 
-        const o = await fetch(proxy + oddsURL);
-        const data = await o.json();
+                const homeScore = m.score?.fullTime?.home;
+                const awayScore = m.score?.fullTime?.away;
+                if (homeScore == null || awayScore == null) return;
 
-        oddsMap = {};
-        const outcomes = data?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+                if(homeScore > awayScore) { if(h) points[h]+=3; }
+                else if(awayScore > homeScore) { if(a) points[a]+=3; }
+                else { if(h) points[h]+=1; if(a) points[a]+=1; }
+            });
 
-        outcomes.forEach(x => {
-            oddsMap[normalize(x.name)] = x.price;
-        });
+            const sorted = Object.entries(points).sort((a,b) => b[1] - a[1]);
+            document.getElementById('leaderboard').innerHTML = sorted.map((p,i) => `
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="${i<3?'text-amber-400 font-bold':''}">${i+1}. ${p[0]}</span>
+                    <span class="font-bold">${p[1]} pts</span>
+                </div>
+            `).join('');
+        }
 
-        // MATCHES
-        const m = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
-        const md = await m.json();
-
-        renderMatches(md.matches || []);
-        renderLeaderboard(md.matches || []);
-
-        // STANDINGS
-        const s = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
-        const sd = await s.json();
-
-        renderStats(sd.standings || []);
-
-    } catch (e) {
-        console.log("error", e);
-    }
-}
-
-init();
-</script>
-
+        init();
+    </script>
 </body>
 </html>
