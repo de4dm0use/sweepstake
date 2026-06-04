@@ -1,218 +1,193 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WC 2026 Sweepstakes Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WC 2026 Sweepstake</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+.glass { background: rgba(30,41,59,0.7); backdrop-filter: blur(10px); }
+</style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
 
-    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div class="lg:col-span-3">
-            <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
-            <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit"></div>
-        </div>
+<body class="bg-slate-950 text-white p-4">
 
-        <div class="lg:col-span-5">
-            <h2 class="text-xl font-black mb-4 text-blue-400">⚽ Match Schedule</h2>
-            <div id="match-table" class="space-y-3"></div>
-        </div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-        <div class="lg:col-span-4">
-            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats & Odds</h2>
-            <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto"></div>
-        </div>
-    </div>
+  <div class="lg:col-span-3 glass p-3 rounded-xl">
+    <h2 class="text-amber-400 font-bold mb-2">Leaderboard</h2>
+    <div id="leaderboard"></div>
+  </div>
 
-   <script>
-const FOOTBALL_DATA_KEY = "55a93c4b0f5142c4bfa22b58edbc5177";
-const ODDS_API_KEY = "0505e1fe83a9649a8048acec4cb62fd7";
+  <div class="lg:col-span-6 glass p-3 rounded-xl">
+    <h2 class="text-blue-400 font-bold mb-2">Matches</h2>
+    <div id="matches"></div>
+  </div>
 
-let tournamentOdds = {};
+  <div class="lg:col-span-3 glass p-3 rounded-xl h-[80vh] overflow-y-auto">
+    <h2 class="text-emerald-400 font-bold mb-2">Stats</h2>
+    <div id="stats"></div>
+  </div>
 
+</div>
+
+<script>
+/* ---------------- YOUR KEYS ---------------- */
+const FOOTBALL_KEY = "55a93c4b0f5142c4bfa22b58edbc5177";
+const ODDS_KEY = "0505e1fe83a9649a8048acec4cb62fd7";
+
+/* ---------------- PROXY ---------------- */
+const proxy = "https://api.allorigins.win/raw?url=";
+
+let odds = {};
+
+/* ---------------- ROSTER ---------------- */
 const roster = [
-    { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
-    { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
-    { name: "Alex", countries: ["Canada", "Haiti", "USA"] },
-    { name: "Christopher", countries: ["Colombia", "Turkey", "Senegal"] },
-    { name: "Stan", countries: ["Ecuador", "Saudi Arabia", "South Korea"] },
-    { name: "Isaac", countries: ["Uzbekistan", "Switzerland", "Ivory Coast"] },
-    { name: "Mason", countries: ["Egypt", "Germany", "New Zealand"] },
-    { name: "Elijah", countries: ["South Africa", "France", "Congo DR"] },
-    { name: "Owen", countries: ["Morocco", "Netherlands", "Tunisia"] },
-    { name: "Oscar W", countries: ["Ghana", "Panama", "Norway"] },
-    { name: "Thomas", countries: ["Mexico", "Portugal", "Scotland"] },
-    { name: "Robin", countries: ["Croatia", "Qatar", "Sweden"] },
-    { name: "Ethan", countries: ["Belgium", "Brazil", "Japan"] },
-    { name: "Edwyn", countries: ["Curacao", "Bosnia and Herzegovina", "Paraguay"] },
-    { name: "Oscar L", countries: ["Czech Republic", "Uruguay", "Jordan"] },
-    { name: "Joel", countries: ["England", "Spain", "Austria"] }
+  { name:"Archie", countries:["Argentina","Cape Verde","Iraq"] },
+  { name:"Liam", countries:["Algeria","Iran","Australia"] },
+  { name:"Alex", countries:["Canada","Haiti","USA"] },
+  { name:"Christopher", countries:["Colombia","Turkey","Senegal"] },
+  { name:"Stan", countries:["Ecuador","Saudi Arabia","South Korea"] },
+  { name:"Isaac", countries:["Uzbekistan","Switzerland","Ivory Coast"] },
+  { name:"Mason", countries:["Egypt","Germany","New Zealand"] },
+  { name:"Elijah", countries:["South Africa","France","Congo DR"] },
+  { name:"Owen", countries:["Morocco","Netherlands","Tunisia"] },
+  { name:"Oscar W", countries:["Ghana","Panama","Norway"] },
+  { name:"Thomas", countries:["Mexico","Portugal","Scotland"] },
+  { name:"Robin", countries:["Croatia","Qatar","Sweden"] },
+  { name:"Ethan", countries:["Belgium","Brazil","Japan"] },
+  { name:"Edwyn", countries:["Curacao","Bosnia and Herzegovina","Paraguay"] },
+  { name:"Oscar L", countries:["Czech Republic","Uruguay","Jordan"] },
+  { name:"Joel", countries:["England","Spain","Austria"] }
 ];
 
-function getOwner(teamName) {
-    const t = teamName.toLowerCase();
-    const found = roster.find(p =>
-        p.countries.some(c => t.includes(c.toLowerCase()))
-    );
-    return found ? found.name : "Unowned";
-}
-
-/* ---------------- STATS ---------------- */
-function renderStats(standings) {
-    const container = document.getElementById("stats-table");
-    container.innerHTML = "";
-
-    if (!standings) {
-        container.innerHTML = "<p class='text-slate-400'>No standings loaded</p>";
-        return;
-    }
-
-    standings.forEach(group => {
-        container.innerHTML += `
-            <h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">
-                ${group.group}
-            </h3>
-        `;
-
-        group.table.forEach(team => {
-            const name = team.team.name;
-            const owner = getOwner(name);
-            const odds = tournamentOdds[name.toLowerCase()] ?? "N/A";
-
-            container.innerHTML += `
-                <div class="flex justify-between items-center text-sm py-2 border-b border-slate-800/50">
-                    <div>
-                        <div class="font-medium">${name}</div>
-                        <div class="text-[9px] text-amber-500 uppercase font-bold">
-                            Owner: ${owner}
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-emerald-400 font-bold font-mono">
-                            ${team.points ?? 0} pts
-                        </div>
-                        <div class="text-[10px] text-blue-400">
-                            Odds: ${odds}
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-    });
+function owner(team){
+  team = team.toLowerCase();
+  const found = roster.find(p =>
+    p.countries.some(c => team.includes(c.toLowerCase()))
+  );
+  return found ? found.name : "Unowned";
 }
 
 /* ---------------- MATCHES ---------------- */
-function renderMatches(matches) {
-    const el = document.getElementById("match-table");
-    el.innerHTML = "";
+function renderMatches(data){
+  const el = document.getElementById("matches");
+  el.innerHTML = "";
 
-    if (!matches?.matches) {
-        el.innerHTML = "<p class='text-slate-400'>No matches loaded</p>";
-        return;
-    }
+  if(!data?.matches){
+    el.innerHTML = "No matches";
+    return;
+  }
 
-    matches.matches.slice(0, 20).forEach(m => {
-        el.innerHTML += `
-            <div class="glass p-3 rounded-xl border border-slate-800">
-                <div class="flex justify-between text-sm">
-                    <span>${m.homeTeam.name}</span>
-                    <span class="text-slate-400">vs</span>
-                    <span>${m.awayTeam.name}</span>
-                </div>
-                <div class="text-xs text-slate-400 mt-1">
-                    ${m.status} • ${m.utcDate?.slice(0,10)}
-                </div>
-            </div>
-        `;
-    });
+  data.matches.slice(0,20).forEach(m=>{
+    el.innerHTML += `
+      <div class="border-b border-slate-700 py-2 text-sm">
+        ${m.homeTeam.name} vs ${m.awayTeam.name}
+        <div class="text-xs text-slate-400">${m.status}</div>
+      </div>
+    `;
+  });
 }
 
 /* ---------------- LEADERBOARD ---------------- */
-function renderLeaderboard(standings) {
-    const el = document.getElementById("leaderboard");
-    el.innerHTML = "";
+function renderLeaderboard(data){
+  const el = document.getElementById("leaderboard");
+  el.innerHTML = "";
 
-    if (!standings) return;
+  if(!data?.standings) return;
 
-    const flat = [];
+  let all = [];
 
-    standings.forEach(g => {
-        g.table.forEach(t => {
-            flat.push({
-                name: t.team.name,
-                pts: t.points ?? 0
-            });
-        });
+  data.standings.forEach(g=>{
+    g.table.forEach(t=>{
+      all.push({
+        name: t.team.name,
+        pts: t.points || 0
+      });
     });
+  });
 
-    flat.sort((a,b) => b.pts - a.pts);
+  all.sort((a,b)=>b.pts-a.pts);
 
-    flat.slice(0, 10).forEach(p => {
-        el.innerHTML += `
-            <div class="flex justify-between py-1 text-sm border-b border-slate-800/50">
-                <span>${p.name}</span>
-                <span class="text-emerald-400 font-mono">${p.pts}</span>
-            </div>
-        `;
+  all.slice(0,10).forEach(p=>{
+    el.innerHTML += `
+      <div class="flex justify-between text-sm border-b border-slate-800 py-1">
+        <span>${p.name}</span>
+        <span class="text-emerald-400">${p.pts}</span>
+      </div>
+    `;
+  });
+}
+
+/* ---------------- STATS ---------------- */
+function renderStats(data){
+  const el = document.getElementById("stats");
+  el.innerHTML = "";
+
+  if(!data) return;
+
+  data.forEach(g=>{
+    el.innerHTML += `<div class="text-xs text-slate-400 mt-2">${g.group}</div>`;
+
+    g.table.forEach(t=>{
+      el.innerHTML += `
+        <div class="text-sm border-b border-slate-800 py-1">
+          <div>${t.team.name}</div>
+          <div class="text-xs text-amber-400">
+            Owner: ${owner(t.team.name)}
+          </div>
+        </div>
+      `;
     });
+  });
 }
 
 /* ---------------- INIT ---------------- */
-async function init() {
-    const proxy = "https://corsproxy.io/?";
+async function init(){
 
-    try {
-        /* ODDS */
-        const oddsUrl =
-            `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_API_KEY}&regions=uk&markets=outrights`;
+  try{
+    const oddsURL =
+      `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_KEY}&regions=uk&markets=h2h`;
 
-        const resOdds = await fetch(proxy + oddsUrl);
-        const dataOdds = await resOdds.json();
+    const o = await fetch(proxy + encodeURIComponent(oddsURL));
+    const od = await o.json();
 
-        const outcomes =
-            dataOdds?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+    const outcomes =
+      od?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
 
-        outcomes.forEach(o => {
-            tournamentOdds[o.name.toLowerCase()] = o.price;
-        });
+    outcomes.forEach(x=>{
+      odds[x.name.toLowerCase()] = x.price;
+    });
 
-    } catch (e) {
-        console.error("Odds error", e);
-    }
+  }catch(e){console.log("odds fail",e);}
 
-    try {
-        /* MATCHES */
-        const resMatches = await fetch(
-            "https://api.football-data.org/v4/competitions/WC/matches",
-            { headers: { "X-Auth-Token": FOOTBALL_DATA_KEY } }
-        );
-        const matches = await resMatches.json();
-        renderMatches(matches);
+  try{
+    const m = await fetch(
+      proxy + encodeURIComponent(
+        "https://api.football-data.org/v4/competitions/WC/matches"
+      )
+    );
+    const md = await m.json();
+    renderMatches(md);
 
-        /* STANDINGS */
-        const resStats = await fetch(
-            "https://api.football-data.org/v4/competitions/WC/standings",
-            { headers: { "X-Auth-Token": FOOTBALL_DATA_KEY } }
-        );
-        const stats = await resStats.json();
+    const s = await fetch(
+      proxy + encodeURIComponent(
+        "https://api.football-data.org/v4/competitions/WC/standings"
+      )
+    );
+    const sd = await s.json();
 
-        const standings = stats?.standings || [];
+    renderLeaderboard(sd);
+    renderStats(sd.standings);
 
-        renderStats(standings);
-        renderLeaderboard(standings);
-
-    } catch (e) {
-        console.error("API error", e);
-    }
+  }catch(e){
+    console.log("api fail",e);
+  }
 }
 
 init();
 </script>
+
 </body>
 </html>
