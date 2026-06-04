@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WC 2026 Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -14,7 +14,6 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
 
     <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
         <div class="lg:col-span-3">
             <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
             <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit">
@@ -30,7 +29,7 @@
         </div>
 
         <div class="lg:col-span-4">
-            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats</h2>
+            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats & Odds</h2>
             <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto">
                 <p class="text-slate-500 text-sm">Loading standings...</p>
             </div>
@@ -38,6 +37,9 @@
     </div>
 
     <script>
+        const FOOTBALL_KEY = "55a93c4b0f5142c4bfa22b58edbc5177";
+        const ODDS_KEY = "0505e1fe83a9649a8048acec4cb62fd7";
+
         const roster = [
             { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
             { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
@@ -67,88 +69,66 @@
                 .trim();
         }
 
-        function getOdds(teamName) {
-            const n = normalizeName(teamName);
-
-            const aliases = {
-                "usa": ["usa", "united states", "united states of america"],
-                "south korea": ["south korea", "korea republic", "republic of korea"],
-                "ivory coast": ["ivory coast", "cote divoire", "côte divoire", "ivory coast"],
-                "congo dr": ["congo dr", "dr congo", "democratic republic of congo", "dem rep congo"],
-                "curacao": ["curacao", "curaçao"],
-                "czech republic": ["czech republic", "czechia"],
-                "saudi arabia": ["saudi arabia"],
-                "bosnia and herzegovina": ["bosnia and herzegovina"],
-                "cape verde": ["cape verde"],
-                "new zealand": ["new zealand"]
-            };
-
-            for (const [key, values] of Object.entries(aliases)) {
-                if (values.some(v => n === normalizeName(v) || n.includes(normalizeName(v)))) {
-                    const found = oddsMap[normalizeName(key)];
-                    if (found !== undefined) return found;
-                }
+        function buildProxyUrl(targetUrl, reqHeaders = {}) {
+            let url = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
+            for (const [key, value] of Object.entries(reqHeaders)) {
+                url += `&reqHeaders=${encodeURIComponent(`${key}:${value}`)}`;
             }
-
-            return oddsMap[n] ?? "N/A";
+            return url;
         }
 
         function getOwner(teamName) {
-            const found = roster.find(p =>
-                p.countries.some(c => normalizeName(teamName).includes(normalizeName(c)))
-            );
+            const t = normalizeName(teamName);
+            const found = roster.find(p => p.countries.some(c => t.includes(normalizeName(c))));
             return found ? found.name : "Unowned";
         }
 
-        async function init() {
-            const proxy = "https://corsproxy.io/?";
+        function getOdds(teamName) {
+            const n = normalizeName(teamName);
 
-            // Fetch odds first
-            try {
-                const oddsURL = "https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=0505e1fe83a9649a8048acec4cb62fd7&regions=uk&markets=h2h";
-                const resOdds = await fetch(proxy + oddsURL);
-                const dataOdds = await resOdds.json();
+            const aliases = [
+                n,
+                ...(
+                    {
+                        "usa": ["united states", "united states of america"],
+                        "south korea": ["korea republic", "republic of korea"],
+                        "ivory coast": ["cote divoire", "côte divoire", "cote d ivoire"],
+                        "congo dr": ["dr congo", "democratic republic of congo", "dem rep congo"],
+                        "curacao": ["curaçao"],
+                        "czech republic": ["czechia"],
+                        "saudi arabia": [],
+                        "bosnia and herzegovina": [],
+                        "cape verde": [],
+                        "new zealand": []
+                    }[n] || [])
+            ].map(normalizeName);
 
-                const outcomes = dataOdds?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
-                outcomes.forEach(o => {
-                    oddsMap[normalizeName(o.name)] = o.price;
-                });
-            } catch (e) {
-                console.log("odds fail", e);
+            for (const [k, v] of Object.entries(oddsMap)) {
+                const nk = normalizeName(k);
+                if (aliases.some(a => nk === a || nk.includes(a) || a.includes(nk))) return v;
             }
 
-            // Fetch Matches
-            try {
-                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
-                const dataMatches = await resMatches.json();
-                renderMatches(dataMatches.matches || []);
-                renderLeaderboard(dataMatches.matches || []);
-            } catch (e) {
-                document.getElementById('match-table').innerHTML = "Error loading matches.";
-            }
-
-            // Fetch Standings (Stats)
-            try {
-                const resStats = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
-                const dataStats = await resStats.json();
-                renderStats(dataStats.standings || []);
-            } catch (e) {
-                document.getElementById('stats-table').innerHTML = "No stats available yet.";
-            }
+            return "N/A";
         }
 
         function renderStats(standings) {
             const container = document.getElementById('stats-table');
             container.innerHTML = "";
-            if (!standings.length) {
+
+            if (!standings || !standings.length) {
                 container.innerHTML = `<p class="text-slate-500 text-sm">No standings available yet.</p>`;
                 return;
             }
-            
+
             standings.forEach(group => {
-                container.innerHTML += `<h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">${group.group}</h3>`;
+                container.innerHTML += `
+                    <h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">
+                        ${group.group || "TOTAL"}
+                    </h3>
+                `;
+
                 group.table.forEach(team => {
-                    const teamName = team.team.name;
+                    const teamName = team.team?.name || "Unknown";
                     const owner = getOwner(teamName);
                     const odds = getOdds(teamName);
 
@@ -159,8 +139,8 @@
                                 <div class="text-[10px] text-amber-500 uppercase font-bold">Owner: ${owner}</div>
                             </div>
                             <div class="flex flex-col items-end gap-0.5 font-mono text-xs whitespace-nowrap">
-                                <span class="text-slate-400">P:${team.playedGames}</span>
-                                <span class="text-emerald-400 font-bold">${team.points}pts</span>
+                                <span class="text-slate-400">P:${team.playedGames ?? 0}</span>
+                                <span class="text-emerald-400 font-bold">${team.points ?? 0}pts</span>
                                 <span class="text-blue-400">Odds: ${odds}</span>
                             </div>
                         </div>
@@ -171,7 +151,8 @@
 
         function renderMatches(matches) {
             const table = document.getElementById('match-table');
-            if (!matches.length) {
+
+            if (!matches || !matches.length) {
                 table.innerHTML = `<p class="text-slate-500 text-sm">No matches available yet.</p>`;
                 return;
             }
@@ -188,31 +169,78 @@
         }
 
         function renderLeaderboard(matches) {
-            let points = {};
+            const points = {};
             roster.forEach(r => points[r.name] = 0);
-            
+
             matches.filter(m => m.status === "FINISHED").forEach(m => {
                 const homeTeamName = m.homeTeam?.name || "";
                 const awayTeamName = m.awayTeam?.name || "";
-                const h = roster.find(r => r.countries.some(c => normalizeName(homeTeamName).includes(normalizeName(c))))?.name;
-                const a = roster.find(r => r.countries.some(c => normalizeName(awayTeamName).includes(normalizeName(c))))?.name;
+                const homeOwner = roster.find(r => r.countries.some(c => normalizeName(homeTeamName).includes(normalizeName(c))))?.name;
+                const awayOwner = roster.find(r => r.countries.some(c => normalizeName(awayTeamName).includes(normalizeName(c))))?.name;
 
                 const homeScore = m.score?.fullTime?.home;
                 const awayScore = m.score?.fullTime?.away;
                 if (homeScore == null || awayScore == null) return;
 
-                if(homeScore > awayScore) { if(h) points[h]+=3; }
-                else if(awayScore > homeScore) { if(a) points[a]+=3; }
-                else { if(h) points[h]+=1; if(a) points[a]+=1; }
+                if (homeScore > awayScore) {
+                    if (homeOwner) points[homeOwner] += 3;
+                } else if (awayScore > homeScore) {
+                    if (awayOwner) points[awayOwner] += 3;
+                } else {
+                    if (homeOwner) points[homeOwner] += 1;
+                    if (awayOwner) points[awayOwner] += 1;
+                }
             });
 
-            const sorted = Object.entries(points).sort((a,b) => b[1] - a[1]);
-            document.getElementById('leaderboard').innerHTML = sorted.map((p,i) => `
+            const sorted = Object.entries(points).sort((a, b) => b[1] - a[1]);
+            document.getElementById('leaderboard').innerHTML = sorted.map((p, i) => `
                 <div class="flex justify-between py-2 border-b border-slate-800">
-                    <span class="${i<3?'text-amber-400 font-bold':''}">${i+1}. ${p[0]}</span>
+                    <span class="${i < 3 ? 'text-amber-400 font-bold' : ''}">${i + 1}. ${p[0]}</span>
                     <span class="font-bold">${p[1]} pts</span>
                 </div>
             `).join('');
+        }
+
+        async function init() {
+            const proxyHeaders = {
+                "Accept": "application/json",
+                "X-Auth-Token": FOOTBALL_KEY
+            };
+
+            try {
+                const oddsURL = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_KEY}&regions=uk&markets=outrights`;
+                const resOdds = await fetch(buildProxyUrl(oddsURL));
+                const dataOdds = await resOdds.json();
+
+                oddsMap = {};
+                const outcomes = dataOdds?.[0]?.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+                outcomes.forEach(o => {
+                    oddsMap[normalizeName(o.name)] = o.price;
+                });
+            } catch (e) {
+                console.log("odds fail", e);
+            }
+
+            try {
+                const matchesURL = "https://api.football-data.org/v4/competitions/WC/matches";
+                const resMatches = await fetch(buildProxyUrl(matchesURL, proxyHeaders));
+                const dataMatches = await resMatches.json();
+
+                renderMatches(dataMatches.matches || []);
+                renderLeaderboard(dataMatches.matches || []);
+            } catch (e) {
+                document.getElementById('match-table').innerHTML = "Error loading matches.";
+            }
+
+            try {
+                const standingsURL = "https://api.football-data.org/v4/competitions/WC/standings";
+                const resStats = await fetch(buildProxyUrl(standingsURL, proxyHeaders));
+                const dataStats = await resStats.json();
+
+                renderStats(dataStats.standings || []);
+            } catch (e) {
+                document.getElementById('stats-table').innerHTML = "No stats available yet.";
+            }
         }
 
         init();
