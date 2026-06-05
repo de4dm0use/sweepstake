@@ -111,6 +111,15 @@
             return "N/A";
         }
 
+        function getOwnerStrength(countries) {
+            let totalProb = 0;
+            countries.forEach(c => {
+                const odds = oddsMap[normalizeName(c)];
+                if (odds) totalProb += (1 / odds);
+            });
+            return (totalProb * 100).toFixed(1);
+        }
+
         function renderStats(standings) {
             const container = document.getElementById('stats-table');
             container.innerHTML = "";
@@ -132,7 +141,6 @@
                     const owner = getOwner(teamName);
                     const rawOdds = getOdds(teamName);
                     
-                    // Calculate percentage if the odds are a valid number
                     const winPercent = typeof rawOdds === 'number' 
                         ? `${((1 / rawOdds) * 100).toFixed(1)}%` 
                         : "N/A";
@@ -198,12 +206,19 @@
             });
 
             const sorted = Object.entries(points).sort((a, b) => b[1] - a[1]);
-            document.getElementById('leaderboard').innerHTML = sorted.map((p, i) => `
-                <div class="flex justify-between py-2 border-b border-slate-800">
-                    <span class="${i < 3 ? 'text-amber-400 font-bold' : ''}">${i + 1}. ${p[0]}</span>
-                    <span class="font-bold">${p[1]} pts</span>
-                </div>
-            `).join('');
+            document.getElementById('leaderboard').innerHTML = sorted.map((p, i) => {
+                const ownerObj = roster.find(r => r.name === p[0]);
+                const strength = ownerObj ? getOwnerStrength(ownerObj.countries) : "0.0";
+                return `
+                    <div class="flex justify-between py-2 border-b border-slate-800">
+                        <div class="flex flex-col">
+                            <span class="${i < 3 ? 'text-amber-400 font-bold' : ''}">${i + 1}. ${p[0]}</span>
+                            <span class="text-[10px] text-slate-500">Strength: ${strength}%</span>
+                        </div>
+                        <span class="font-bold">${p[1]} pts</span>
+                    </div>
+                `;
+            }).join('');
         }
 
         async function init() {
@@ -223,14 +238,12 @@
                     oddsMap[normalizeName(o.name)] = o.price;
                 });
 
-                // Force fallback if the API returns no data
                 if (Object.keys(oddsMap).length === 0) {
                     throw new Error("API returned no odds data");
                 }
             } catch (e) {
                 console.log("Using fallback odds.", e);
-                // Injected fallback odds so the dashboard displays correctly today
-              const fallbackOdds = {
+                const fallbackOdds = {
                     "argentina": 6.00, "brazil": 6.50, "france": 7.00, "england": 7.50,
                     "spain": 9.00, "germany": 10.00, "portugal": 15.00, "united states": 21.00,
                     "mexico": 41.00, "netherlands": 17.00, "belgium": 26.00, "italy": 21.00,
