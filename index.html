@@ -131,9 +131,11 @@
                 tournamentOdds = fallbackOdds;
             }
 
-            // B. Fetch Matches
+         // B. Fetch Matches
             try {
-                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
+                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches", {
+                    headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY } // <-- ADDED THIS BACK
+                });
                 const dataMatches = await resMatches.json();
                 renderMatches(dataMatches.matches);
                 renderLeaderboard(dataMatches.matches);
@@ -141,6 +143,7 @@
                 document.getElementById('match-table').innerHTML = "Error loading matches.";
             }
 
+           
             // C. Fetch Standings (Stats)
             try {
                 const resStats = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
