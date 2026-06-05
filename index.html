@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,26 +8,51 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-10">
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
 
-    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <div class="lg:col-span-1">
-            <h2 class="text-2xl font-black mb-6 text-amber-400">🏆 Leaderboard</h2>
-            <div id="leaderboard" class="glass p-6 rounded-3xl border border-slate-800 shadow-2xl">
-                </div>
+        <div class="lg:col-span-3">
+            <h2 class="text-xl font-black mb-4 text-amber-400">🏆 Leaderboard</h2>
+            <div id="leaderboard" class="glass p-5 rounded-2xl border border-slate-800 h-fit">
+                <p class="text-slate-500 text-sm">Syncing data...</p>
+            </div>
         </div>
 
-        <div class="lg:col-span-3">
-            <h2 class="text-2xl font-black mb-6 text-blue-400">⚽ Match Schedule</h2>
-            <div id="match-table" class="space-y-4">
-                </div>
+        <div class="lg:col-span-5">
+            <h2 class="text-xl font-black mb-4 text-blue-400">⚽ Match Schedule</h2>
+            <div id="match-table" class="space-y-3">
+                <p class="text-slate-500 text-sm">Fetching matches...</p>
+            </div>
+        </div>
+
+        <div class="lg:col-span-4">
+            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats & Win %</h2>
+            <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto">
+                <p class="text-slate-500 text-sm">Loading standings...</p>
+            </div>
         </div>
     </div>
 
     <script>
+        // --- 1. CONFIGURATION ---
+        // ⚠️ PASTE YOUR KEYS HERE
+        const FOOTBALL_DATA_KEY = "55a93c4b0f5142c4bfa22b58edbc5177"; 
+        const ODDS_API_KEY = "YOUR_ODDS_API_KEY"; 
+        
+        let tournamentOdds = {};
+
+        // Fallback odds (Used automatically if API is inactive)
+        const fallbackOdds = {
+            "argentina": "+150", "brazil": "+200", "france": "+250", "england": "+300", 
+            "spain": "+400", "germany": "+500", "portugal": "+600", "usa": "+1500",
+            "mexico": "+2000", "netherlands": "+800", "belgium": "+1000"
+        };
+
         const roster = [
             { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
             { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
@@ -46,58 +72,150 @@
             { name: "Joel", countries: ["England", "Spain", "Austria"] }
         ];
 
+        // --- 2. HELPER FUNCTIONS ---
         function getOwner(teamName) {
             const found = roster.find(p => p.countries.some(c => teamName.toLowerCase().includes(c.toLowerCase())));
             return found ? found.name : "Unowned";
         }
 
+        function normalizeName(name) {
+            let n = name.toLowerCase();
+            if (n.includes("usa") || n.includes("united states")) return "usa";
+            if (n.includes("korea")) return "south korea";
+            return n;
+        }
+
+        function calculateWinPercentage(odds) {
+            if (!odds || odds === "N/A") return "N/A";
+            let probability = 0;
+            if (typeof odds === 'string' && (odds.startsWith('+') || odds.startsWith('-'))) {
+                let val = parseInt(odds, 10);
+                if (val > 0) probability = 100 / (val + 100);
+                else probability = Math.abs(val) / (Math.abs(val) + 100);
+            } else {
+                let val = parseFloat(odds);
+                if (val > 0) probability = 1 / val;
+            }
+            if (probability === 0) return "N/A";
+            return (probability * 100).toFixed(1) + "%";
+        }
+
+        // --- 3. FETCH DATA ---
         async function init() {
-            // Your working fetch call here
-            const res = await fetch("https://corsproxy.io/?https://api.football-data.org/v4/competitions/WC/matches");
-            const data = await res.json();
+            const proxy = "https://corsproxy.io/?";
             
+            // This is the header that fixes the 403 Forbidden error!
+            const fbDataOptions = {
+                headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY }
+            };
+            
+            // A. Fetch Odds
+            try {
+                const oddsUrl = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_API_KEY}&regions=uk&markets=outrights`;
+                const resOdds = await fetch(proxy + encodeURIComponent(oddsUrl));
+                if (!resOdds.ok) throw new Error("Odds API unavailable");
+                
+                const dataOdds = await resOdds.json();
+                if(dataOdds && dataOdds[0]) {
+                    dataOdds[0].bookmakers[0].markets[0].outcomes.forEach(o => {
+                        tournamentOdds[normalizeName(o.name)] = o.price;
+                    });
+                }
+            } catch (e) {
+                console.log("Odds API fallback engaged.");
+                tournamentOdds = fallbackOdds;
+            }
+
+            // B. Fetch Matches
+            try {
+                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches", fbDataOptions);
+                const dataMatches = await resMatches.json();
+                renderMatches(dataMatches.matches);
+                renderLeaderboard(dataMatches.matches);
+            } catch (e) {
+                document.getElementById('match-table').innerHTML = "No matches scheduled yet or API error.";
+            }
+
+            // C. Fetch Standings (Stats)
+            try {
+                const resStats = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings", fbDataOptions);
+                const dataStats = await resStats.json();
+                renderStats(dataStats.standings);
+            } catch (e) {
+                document.getElementById('stats-table').innerHTML = "No stats available yet or API error.";
+            }
+        }
+
+        // --- 4. RENDER FUNCTIONS ---
+        function renderStats(standings) {
+            const container = document.getElementById('stats-table');
+            container.innerHTML = "";
+            if (!standings || !Array.isArray(standings)) {
+                container.innerHTML = "No standings data generated yet.";
+                return;
+            }
+            
+            standings.forEach(group => {
+                container.innerHTML += `<h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">${group.group}</h3>`;
+                group.table.forEach(team => {
+                    const owner = getOwner(team.team.name);
+                    const normalizedTeamName = normalizeName(team.team.name);
+                    const rawOdds = tournamentOdds[normalizedTeamName] || "N/A";
+                    const winPercent = calculateWinPercentage(rawOdds);
+                    
+                    container.innerHTML += `
+                        <div class="flex justify-between items-center text-sm py-2 border-b border-slate-800/50">
+                            <div>
+                                <span class="font-medium">${team.team.name}</span>
+                                <div class="text-[10px] text-amber-500 uppercase font-bold tracking-wider mt-0.5">Owner: ${owner}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="flex gap-4 justify-end font-mono text-xs mb-1">
+                                    <span class="text-slate-400">P:${team.playedGames}</span>
+                                    <span class="text-emerald-400 font-bold">${team.points}pts</span>
+                                </div>
+                                <div class="text-[11px] text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 rounded inline-block">Win: ${winPercent}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        function renderMatches(matches) {
+            const table = document.getElementById('match-table');
+            if(!matches || matches.length === 0) {
+                table.innerHTML = "No match data currently available.";
+                return;
+            }
+            table.innerHTML = matches.map(m => `
+                <div class="glass p-4 rounded-xl flex justify-between items-center border border-slate-800 text-sm">
+                    <div class="w-1/3 truncate font-medium text-xs">${m.homeTeam.name}</div>
+                    <div class="font-mono font-black bg-slate-950 px-2 py-1 rounded mx-2">${m.score?.fullTime?.home ?? '-'} : ${m.score?.fullTime?.away ?? '-'}</div>
+                    <div class="w-1/3 truncate text-right font-medium text-xs">${m.awayTeam.name}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderLeaderboard(matches) {
             let points = {};
             roster.forEach(r => points[r.name] = 0);
+            
+            if(!matches) return;
 
-            // Populate Table
-            const table = document.getElementById('match-table');
-            data.matches.forEach(m => {
-                const home = m.homeTeam.name;
-                const away = m.awayTeam.name;
-                const ownerH = getOwner(home);
-                const ownerA = getOwner(away);
-                
-                // Score logic
-                if (m.status === "FINISHED") {
-                    if (m.score.fullTime.home > m.score.fullTime.away) points[ownerH] += 3;
-                    else if (m.score.fullTime.away > m.score.fullTime.home) points[ownerA] += 3;
-                    else { points[ownerH] += 1; points[ownerA] += 1; }
-                }
-
-                table.innerHTML += `
-                    <div class="glass p-5 rounded-2xl flex items-center justify-between border border-slate-800 hover:border-slate-600 transition">
-                        <div class="w-1/3 text-right">
-                            <div class="font-bold">${home}</div>
-                            <div class="text-[10px] text-slate-500 uppercase">${ownerH}</div>
-                        </div>
-                        <div class="text-xl font-mono font-black mx-4 bg-slate-950 px-4 py-1 rounded-lg">
-                            ${m.score.fullTime.home ?? '-'} : ${m.score.fullTime.away ?? '-'}
-                        </div>
-                        <div class="w-1/3 text-left">
-                            <div class="font-bold">${away}</div>
-                            <div class="text-[10px] text-slate-500 uppercase">${ownerA}</div>
-                        </div>
-                    </div>
-                `;
+            matches.filter(m => m.status === "FINISHED").forEach(m => {
+                const h = roster.find(r => r.countries.some(c => m.homeTeam.name.includes(c)))?.name;
+                const a = roster.find(r => r.countries.some(c => m.awayTeam.name.includes(c)))?.name;
+                if(m.score.fullTime.home > m.score.fullTime.away) { if(h) points[h]+=3; }
+                else if(m.score.fullTime.away > m.score.fullTime.home) { if(a) points[a]+=3; }
+                else { if(h) points[h]+=1; if(a) points[a]+=1; }
             });
 
-            // Populate Leaderboard
-            const lb = document.getElementById('leaderboard');
             const sorted = Object.entries(points).sort((a,b) => b[1] - a[1]);
-            lb.innerHTML = sorted.map((p, i) => `
-                <div class="flex justify-between py-3 border-b border-slate-800 last:border-0">
-                    <span class="${i<3 ? 'text-amber-400 font-bold' : ''}">${i+1}. ${p[0]}</span>
-                    <span class="font-black">${p[1]} pts</span>
+            document.getElementById('leaderboard').innerHTML = sorted.map((p,i) => `
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="${i<3?'text-amber-400 font-bold':''}">${i+1}. ${p[0]}</span>
+                    <span class="font-bold">${p[1]} pts</span>
                 </div>
             `).join('');
         }
