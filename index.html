@@ -230,13 +230,20 @@
             } catch (e) {
                 console.log("Using fallback odds.", e);
                 // Injected fallback odds so the dashboard displays correctly today
-                const fallbackOdds = {
+              const fallbackOdds = {
                     "argentina": 6.00, "brazil": 6.50, "france": 7.00, "england": 7.50,
                     "spain": 9.00, "germany": 10.00, "portugal": 15.00, "united states": 21.00,
                     "mexico": 41.00, "netherlands": 17.00, "belgium": 26.00, "italy": 21.00,
                     "colombia": 41.00, "uruguay": 41.00, "croatia": 51.00, "japan": 101.00,
-                    "morocco": 81.00, "switzerland": 81.00, "senegal": 101.00, "south korea": 151.00,
-                    "australia": 201.00, "canada": 201.00, "ecuador": 151.00, "saudi arabia": 501.00
+                    "morocco": 81.00, "switzerland": 81.00, "turkey": 81.00, "austria": 81.00,
+                    "senegal": 101.00, "norway": 101.00, "south korea": 151.00, "ecuador": 151.00, 
+                    "sweden": 151.00, "paraguay": 151.00, "czechia": 151.00, "ivory coast": 151.00,
+                    "australia": 201.00, "canada": 201.00, "egypt": 201.00, "ghana": 201.00,
+                    "algeria": 251.00, "south africa": 251.00, "scotland": 251.00, "bosnia-herzegovina": 251.00,
+                    "iran": 301.00, "tunisia": 301.00, "saudi arabia": 501.00, "cape verde": 501.00, 
+                    "new zealand": 501.00, "congo dr": 501.00, "panama": 501.00, "qatar": 501.00,
+                    "iraq": 1001.00, "uzbekistan": 1001.00, "jordan": 1001.00,
+                    "haiti": 2001.00, "curaçao": 2001.00
                 };
                 for (const [team, price] of Object.entries(fallbackOdds)) {
                     oddsMap[normalizeName(team)] = price;
