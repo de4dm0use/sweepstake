@@ -30,7 +30,7 @@
         </div>
 
         <div class="lg:col-span-4">
-            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats & Win %</h2>
+            <h2 class="text-xl font-black mb-4 text-emerald-400">📊 Team Stats</h2>
             <div id="stats-table" class="glass p-5 rounded-2xl border border-slate-800 h-[80vh] overflow-y-auto">
                 <p class="text-slate-500 text-sm">Loading standings...</p>
             </div>
@@ -38,19 +38,6 @@
     </div>
 
     <script>
-        // --- 1. CONFIGURATION ---
-        const FOOTBALL_DATA_KEY = "55a93c4b0f5142c4bfa22b58edbc5177"; 
-        const ODDS_API_KEY = "0505e1fe83a9649a8048acec4cb62fd7"; 
-        
-        let tournamentOdds = {};
-
-        // Fallback odds (American format)
-        const fallbackOdds = {
-            "argentina": "+150", "brazil": "+200", "france": "+250", "england": "+300", 
-            "spain": "+400", "germany": "+500", "portugal": "+600", "usa": "+1500",
-            "mexico": "+2000", "netherlands": "+800", "belgium": "+1000"
-        };
-
         const roster = [
             { name: "Archie", countries: ["Argentina", "Cape Verde", "Iraq"] },
             { name: "Liam", countries: ["Algeria", "Iran", "Australia"] },
@@ -70,72 +57,12 @@
             { name: "Joel", countries: ["England", "Spain", "Austria"] }
         ];
 
-        // --- 2. HELPER FUNCTIONS ---
-        function getOwner(teamName) {
-            const found = roster.find(p => p.countries.some(c => teamName.toLowerCase().includes(c.toLowerCase())));
-            return found ? found.name : "Unowned";
-        }
-
-        function normalizeName(name) {
-            let n = name.toLowerCase();
-            if (n.includes("usa") || n.includes("united states")) return "usa";
-            if (n.includes("korea")) return "south korea";
-            return n;
-        }
-
-        // NEW: Converts any odds format into a clean Win Percentage
-        function calculateWinPercentage(odds) {
-            if (!odds || odds === "N/A") return "N/A";
-            
-            let probability = 0;
-
-            // If American Odds (e.g., "+150" or "-150")
-            if (typeof odds === 'string' && (odds.startsWith('+') || odds.startsWith('-'))) {
-                let val = parseInt(odds, 10);
-                if (val > 0) {
-                    probability = 100 / (val + 100);
-                } else {
-                    probability = Math.abs(val) / (Math.abs(val) + 100);
-                }
-            } 
-            // If Decimal Odds (e.g., 2.50 - default for API)
-            else {
-                let val = parseFloat(odds);
-                if (val > 0) probability = 1 / val;
-            }
-
-            if (probability === 0) return "N/A";
-            
-            // Format to 1 decimal place with a % sign
-            return (probability * 100).toFixed(1) + "%";
-        }
-
-        // --- 3. FETCH DATA ---
         async function init() {
             const proxy = "https://corsproxy.io/?";
             
-            // A. Fetch Odds
+            // Fetch Matches
             try {
-                const oddsUrl = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_API_KEY}&regions=uk&markets=outrights`;
-                const resOdds = await fetch(proxy + encodeURIComponent(oddsUrl));
-                if (!resOdds.ok) throw new Error("Odds API failed");
-                
-                const dataOdds = await resOdds.json();
-                if(dataOdds && dataOdds[0]) {
-                    dataOdds[0].bookmakers[0].markets[0].outcomes.forEach(o => {
-                        tournamentOdds[normalizeName(o.name)] = o.price;
-                    });
-                }
-            } catch (e) {
-                console.warn(e.message + " - Using fallback odds.");
-                tournamentOdds = fallbackOdds;
-            }
-
-         // B. Fetch Matches
-            try {
-                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches", {
-                    headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY } // <-- ADDED THIS BACK
-                });
+                const resMatches = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/matches");
                 const dataMatches = await resMatches.json();
                 renderMatches(dataMatches.matches);
                 renderLeaderboard(dataMatches.matches);
@@ -143,8 +70,7 @@
                 document.getElementById('match-table').innerHTML = "Error loading matches.";
             }
 
-           
-            // C. Fetch Standings (Stats)
+            // Fetch Standings (Stats)
             try {
                 const resStats = await fetch(proxy + "https://api.football-data.org/v4/competitions/WC/standings");
                 const dataStats = await resStats.json();
@@ -154,7 +80,6 @@
             }
         }
 
-        // --- 4. RENDER FUNCTIONS ---
         function renderStats(standings) {
             const container = document.getElementById('stats-table');
             container.innerHTML = "";
@@ -163,26 +88,12 @@
             standings.forEach(group => {
                 container.innerHTML += `<h3 class="text-xs font-bold text-slate-500 uppercase mt-4 mb-2">${group.group}</h3>`;
                 group.table.forEach(team => {
-                    const owner = getOwner(team.team.name);
-                    
-                    const normalizedTeamName = normalizeName(team.team.name);
-                    const rawOdds = tournamentOdds[normalizedTeamName] || "N/A";
-                    
-                    // Call our new function to get the percentage
-                    const winPercent = calculateWinPercentage(rawOdds);
-                    
                     container.innerHTML += `
-                        <div class="flex justify-between items-center text-sm py-2 border-b border-slate-800/50">
-                            <div>
-                                <span class="font-medium">${team.team.name}</span>
-                                <div class="text-[10px] text-amber-500 uppercase font-bold tracking-wider mt-0.5">Owner: ${owner}</div>
-                            </div>
-                            <div class="text-right">
-                                <div class="flex gap-4 justify-end font-mono text-xs mb-1">
-                                    <span class="text-slate-400">P:${team.playedGames}</span>
-                                    <span class="text-emerald-400 font-bold">${team.points}pts</span>
-                                </div>
-                                <div class="text-[11px] text-blue-400 font-bold bg-blue-900/30 px-2 py-0.5 rounded inline-block">Win: ${winPercent}</div>
+                        <div class="flex justify-between items-center text-sm py-1 border-b border-slate-800/50">
+                            <span class="truncate w-1/2">${team.team.name}</span>
+                            <div class="flex gap-4 font-mono text-xs">
+                                <span class="text-slate-400">P:${team.playedGames}</span>
+                                <span class="text-emerald-400 font-bold">${team.points}pts</span>
                             </div>
                         </div>
                     `;
@@ -192,11 +103,10 @@
 
         function renderMatches(matches) {
             const table = document.getElementById('match-table');
-            if(!matches || matches.length === 0) return;
             table.innerHTML = matches.map(m => `
                 <div class="glass p-4 rounded-xl flex justify-between items-center border border-slate-800 text-sm">
                     <div class="w-1/3 truncate font-medium text-xs">${m.homeTeam.name}</div>
-                    <div class="font-mono font-black bg-slate-950 px-2 py-1 rounded mx-2">${m.score?.fullTime?.home ?? '-'} : ${m.score?.fullTime?.away ?? '-'}</div>
+                    <div class="font-mono font-black bg-slate-950 px-2 py-1 rounded mx-2">${m.score.fullTime.home ?? '-'} : ${m.score.fullTime.away ?? '-'}</div>
                     <div class="w-1/3 truncate text-right font-medium text-xs">${m.awayTeam.name}</div>
                 </div>
             `).join('');
@@ -206,8 +116,6 @@
             let points = {};
             roster.forEach(r => points[r.name] = 0);
             
-            if(!matches) return;
-
             matches.filter(m => m.status === "FINISHED").forEach(m => {
                 const h = roster.find(r => r.countries.some(c => m.homeTeam.name.includes(c)))?.name;
                 const a = roster.find(r => r.countries.some(c => m.awayTeam.name.includes(c)))?.name;
